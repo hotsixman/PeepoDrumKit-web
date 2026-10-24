@@ -68,7 +68,7 @@
 
 	function placeNote(type: NoteType): void
 	{
-		timeline.PlaceNote(context, ToBigNoteIf(type, bigNote), timeline.RangeSelectionIsActiveAndHasEnd() && timeline.External.ForceRangeFill);
+		timeline.PlaceNoteAndAdvanceCursor(context, ToBigNoteIf(type, bigNote), timeline.RangeSelectionIsActiveAndHasEnd() && timeline.External.ForceRangeFill);
 	}
 
 	function toggleLongNote(type: "drumroll" | "balloon"): void

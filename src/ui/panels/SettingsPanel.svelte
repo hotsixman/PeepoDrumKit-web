@@ -17,7 +17,7 @@
 		Invalidate();
 	}
 
-	const generalBools: (keyof typeof Settings.General)[] = ["DisplayTimeInSongSpace", "TimelineScrollInvertMouseWheel", "TimelineScrubAutoScrollEnableClamp", "DisableTempoWindowWidgetsIfHasSelection", "ConvertSelectionToScrollChanges_UnselectOld", "ConvertSelectionToScrollChanges_SelectNew"];
+	const generalBools: (keyof typeof Settings.General)[] = ["DisplayTimeInSongSpace", "TimelineAdvanceCursorAfterPlacingNote", "TimelineScrollInvertMouseWheel", "TimelineScrubAutoScrollEnableClamp", "DisableTempoWindowWidgetsIfHasSelection", "ConvertSelectionToScrollChanges_UnselectOld", "ConvertSelectionToScrollChanges_SelectNew"];
 	const generalNumbers: (keyof typeof Settings.General)[] = ["DrumrollAutoHitBarDivision", "TimelineScrollDistancePerMouseWheelTick", "TimelineScrollDistancePerMouseWheelTickFast", "TimelineZoomFactorPerMouseWheelTick", "TimelineScrubAutoScrollPixelThreshold", "TimelineScrubAutoScrollSpeedMin", "TimelineScrubAutoScrollSpeedMax"];
 	const animationNumbers: (keyof typeof Settings.Animation)[] = ["TimelineSmoothScrollSpeed", "TimelineWaveformFadeSpeed", "TimelineRangeSelectionExpansionSpeed", "TimelineWorldSpaceCursorXSpeed", "TimelineGridSnapLineSpeed", "TimelineGoGoRangeExpansionSpeed"];
 	const prettify = (key: string) => key.replace(/_/g, " ").replace(/([a-z])([A-Z])/g, "$1 $2");

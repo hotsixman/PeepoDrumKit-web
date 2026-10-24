@@ -30,6 +30,8 @@ function MakeDefaultUserSettings()
 			DrumrollAutoHitBarDivision: 16,
 			DisplayTimeInSongSpace: false,
 			TimelineScrollInvertMouseWheel: false,
+			// NOTE: Web port addition, step the cursor to the next grid line after placing a don / ka note (while paused)
+			TimelineAdvanceCursorAfterPlacingNote: true,
 			TimelineScrollDistancePerMouseWheelTick: 100.0,
 			TimelineScrollDistancePerMouseWheelTickFast: 250.0,
 			TimelineZoomFactorPerMouseWheelTick: 1.2,

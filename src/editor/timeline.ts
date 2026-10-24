@@ -1569,7 +1569,8 @@ export class ChartTimeline
 	}
 
 	/** NOTE: Equivalent of the "updateNotePlacementBinding" lambda body after the binding has been pressed */
-	PlaceNote(context: ChartContext, noteTypeToInsert: NoteType, fillRangeSelection: boolean): void
+	/** NOTE: Returns the beat a note was added (or changed) at, otherwise null */
+	PlaceNote(context: ChartContext, noteTypeToInsert: NoteType, fillRangeSelection: boolean): Beat | null
 	{
 		const notes = context.ChartSelectedCourse.GetNotes(context.ChartSelectedBranch);
 
@@ -1594,6 +1595,7 @@ export class ChartTimeline
 				context.SfxVoicePool.PlaySound(SoundEffectTypeForNoteType(newNotesToAdd[0].Type));
 				context.Undo.Execute(new Commands.AddMultipleNotes(notes, newNotesToAdd));
 			}
+			return null;
 		}
 		else
 		{
@@ -1618,6 +1620,8 @@ export class ChartTimeline
 						{
 							context.Undo.Execute(new Commands.ChangeSingleNoteType(notes, { Index: existingNoteIndex, NewType: noteTypeToInsert }));
 							context.Undo.DisallowMergeForLastCommand();
+							context.SfxVoicePool.PlaySound(SoundEffectTypeForNoteType(existingNoteAtCursor.Type));
+							return cursorBeat;
 						}
 					}
 				}
@@ -1629,7 +1633,29 @@ export class ChartTimeline
 				newNote.ClickAnimationTimeRemaining = newNote.ClickAnimationTimeDuration = NoteHitAnimationDuration;
 				context.Undo.Execute(new Commands.AddSingleNote(notes, newNote));
 				context.SfxVoicePool.PlaySound(SoundEffectTypeForNoteType(noteTypeToInsert));
+				return cursorBeat;
 			}
+		}
+		return null;
+	}
+
+	/** NOTE: Web port addition, places a don / ka note and then moves the cursor to the next grid line (only while paused) */
+	PlaceNoteAndAdvanceCursor(context: ChartContext, noteTypeToInsert: NoteType, fillRangeSelection: boolean): void
+	{
+		const placedBeat = this.PlaceNote(context, noteTypeToInsert, fillRangeSelection);
+		if (placedBeat === null || context.GetIsPlayback() || !Settings.General.TimelineAdvanceCursorAfterPlacingNote)
+			return;
+
+		const oldCursorTime = context.GetCursorTime();
+		const newCursorBeat = placedBeat + GetGridBeatSnap(this.CurrentGridBarDivision);
+		context.SetCursorBeat(newCursorBeat);
+
+		// NOTE: Keep the cursor at the same screen position (same as StepCursorByBeat) so that consecutive notes can be placed without scrolling
+		const cursorLocalSpaceXOld = this.Camera.TimeToLocalSpaceX_AtTarget(oldCursorTime);
+		if (cursorLocalSpaceXOld >= 0.0 && cursorLocalSpaceXOld <= this.Regions.Content.GetWidth())
+		{
+			const cursorLocalSpaceX = this.Camera.TimeToLocalSpaceX(context.BeatToTime(newCursorBeat));
+			this.Camera.PositionTarget.x += (cursorLocalSpaceX - this.Camera.TimeToLocalSpaceX(oldCursorTime));
 		}
 	}
 
@@ -2058,7 +2084,7 @@ export class ChartTimeline
 			const updateNotePlacementBinding = (inputBinding: MultiInputBinding, noteTypeToInsert: NoteType) =>
 			{
 				if (io.IsAnyPressed(inputBinding, false, InputModifierBehavior.Relaxed))
-					this.PlaceNote(context, noteTypeToInsert, keyShift || this.External.ForceRangeFill);
+					this.PlaceNoteAndAdvanceCursor(context, noteTypeToInsert, keyShift || this.External.ForceRangeFill);
 			};
 
 			this.PlaceBalloonBindingDownLastFrame = this.PlaceBalloonBindingDownThisFrame;
