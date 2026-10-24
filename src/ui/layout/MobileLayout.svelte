@@ -26,7 +26,16 @@
 	const timeline = editor.timeline;
 
 	let menuOpen = $state(false);
-	let menuPath: MenuItem[][] = $state([]);
+	// NOTE: Index path (menu, item, sub item...) so that open submenus always show the current labels / states
+	let menuPath: number[][] = $state([]);
+	const currentSubmenu = $derived.by((): MenuItem[] =>
+	{
+		if (menuPath.length === 0) return [];
+		const [menuIndex, ...itemIndices] = menuPath[menuPath.length - 1];
+		let items = data.menus[menuIndex]?.Items ?? [];
+		for (const index of itemIndices) items = items[index]?.Submenu ?? [];
+		return items;
+	});
 	let sheet: string | null = $state(null);
 	let showGame = $state(true);
 	let selectMode = $state(false);
@@ -88,10 +97,11 @@
 		timeline.StepCursorByBeat(context, distance * direction);
 	}
 
-	function openMenuItem(item: MenuItem): void
+	function openMenuItem(item: MenuItem, path: number[]): void
 	{
 		if (item.Enabled === false) return;
-		if (item.Submenu !== undefined) { menuPath = [...menuPath, item.Submenu]; return; }
+		if (item.Submenu !== undefined) { menuPath = [...menuPath, path]; return; }
+		if (item.KeepOpen) { item.Action?.(); Invalidate(); return; }
 		menuOpen = false; menuPath = [];
 		item.Action?.();
 		Invalidate();
@@ -203,12 +213,12 @@
 		<div class="sheet-backdrop" role="presentation" onclick={() => { menuOpen = false; menuPath = []; }}></div>
 		<section class="menu-sheet">
 			{#if menuPath.length === 0}
-				{#each data.menus as menu}
+				{#each data.menus as menu, menuIndex}
 					<div class="menu-group">
 						<div class="menu-group-title">{menu.Label}</div>
-						{#each menu.Items as item}
+						{#each menu.Items as item, itemIndex}
 							{#if !item.Separator}
-								<button class="menu-entry" disabled={item.Enabled === false} onclick={() => openMenuItem(item)}>
+								<button class="menu-entry" disabled={item.Enabled === false} onclick={() => openMenuItem(item, [menuIndex, itemIndex])}>
 									<span>{item.Checked ? "✓ " : ""}{item.Label}</span><span class="dim">{item.Submenu ? "›" : ""}</span>
 								</button>
 							{/if}
@@ -217,9 +227,9 @@
 				{/each}
 			{:else}
 				<button class="menu-entry back" onclick={() => (menuPath = menuPath.slice(0, -1))}>‹ Back</button>
-				{#each menuPath[menuPath.length - 1] as item}
+				{#each currentSubmenu as item, itemIndex}
 					{#if !item.Separator}
-						<button class="menu-entry" disabled={item.Enabled === false} onclick={() => openMenuItem(item)}>
+						<button class="menu-entry" disabled={item.Enabled === false} onclick={() => openMenuItem(item, [...menuPath[menuPath.length - 1], itemIndex])}>
 							<span>{item.Checked ? "✓ " : ""}{item.Label}</span><span class="dim">{item.Submenu ? "›" : ""}</span>
 						</button>
 					{/if}

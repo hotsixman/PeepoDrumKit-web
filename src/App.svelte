@@ -6,6 +6,7 @@
 	import DesktopLayout from "./ui/layout/DesktopLayout.svelte";
 	import MobileLayout from "./ui/layout/MobileLayout.svelte";
 	import ConfirmDialog from "./ui/layout/ConfirmDialog.svelte";
+	import BrowserStorageDialog from "./ui/layout/BrowserStorageDialog.svelte";
 
 	// NOTE: Restore the last used gui language
 	{
@@ -17,6 +18,7 @@
 	let folderInput: HTMLInputElement | undefined = $state();
 	let audioInput: HTMLInputElement | undefined = $state();
 	let dragOver = $state(false);
+	let browserStorageOpen = $state(false);
 
 	// NOTE: Automatic layout selection (small screens or coarse pointers use the mobile layout)
 	let autoMobile = $state(false);
@@ -50,6 +52,7 @@
 		editor.OnRequestOpenChartDialog = () => chartInput?.click();
 		editor.OnRequestOpenAudioDialog = () => audioInput?.click();
 		editor.OnRequestOpenFolderDialog = () => folderInput?.click();
+		editor.OnRequestBrowserStorageDialog = () => { browserStorageOpen = true; };
 
 		let raf = 0, lastTime = performance.now(), lastSignature = "", lastChartVersion = -1, lastTitle = "";
 		let fpsAccumTime = 0, fpsFrames = 0;
@@ -111,6 +114,7 @@
 		<DesktopLayout />
 	{/if}
 	<ConfirmDialog />
+	<BrowserStorageDialog open={browserStorageOpen} onclose={() => (browserStorageOpen = false)} />
 	{#if dragOver}
 		<div class="drop-overlay">{UI_Str("Drop a .tja or audio file here")}</div>
 	{/if}

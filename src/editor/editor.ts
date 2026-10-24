@@ -18,6 +18,7 @@ import type { WaveformWorkerRequest, WaveformWorkerResponse } from "../audio/wav
 import { TempoTapCalculator } from "./tempo-calculator";
 import { LanguageState } from "./i18n";
 import { SettingsVersion } from "./settings";
+import { type BrowserChartEntry, NewBrowserChartID, PutBrowserChart, GetBrowserChart } from "./browser-storage";
 
 export const UntitledChartFileName = "Untitled Chart.tja";
 export const SupportedAudioExtensions = [".flac", ".ogg", ".mp3", ".wav", ".m4a", ".aac", ".opus", ".webm"];
@@ -91,6 +92,8 @@ export class ChartEditor
 	StatusMessageTime = 0.0;
 	PendingConfirmation: ConfirmationRequest | null = null;
 	ChartDirectoryHandle: FileSystemDirectoryHandle | null = null;
+	// NOTE: Web port addition, ID of the browser storage (IndexedDB) entry the current chart was opened from / saved to
+	BrowserChartID: string | null = null;
 	ShowHelp = PersistentApp.LastSession.ShowWindow_Help;
 	ShowSettings = PersistentApp.LastSession.ShowWindow_Settings;
 	ShowTJAExportView = PersistentApp.LastSession.ShowWindow_TJAExportTest;
@@ -100,6 +103,7 @@ export class ChartEditor
 	OnRequestOpenFolderDialog: (() => void) | null = null;
 	OnRequestFocusSettings: (() => void) | null = null;
 	OnRequestFocusHelp: (() => void) | null = null;
+	OnRequestBrowserStorageDialog: (() => void) | null = null;
 	// NOTE: Per frame callbacks for UI components that need to poll the input state (called after the main update)
 	FrameHooks = new Set<() => void>();
 
@@ -179,6 +183,7 @@ export class ChartEditor
 		context.ChartFileHandle = null;
 		context.ChartDirectoryFiles.clear();
 		this.ChartDirectoryHandle = null;
+		this.BrowserChartID = null;
 		context.Chart.Courses.push(new ChartCourse());
 		context.ChartSelectedCourse = context.Chart.Courses[0];
 		context.ChartSelectedBranch = BranchType.Normal;
@@ -283,9 +288,74 @@ export class ChartEditor
 
 	async TrySaveChartOrOpenSaveAsDialog(): Promise<boolean>
 	{
+		// NOTE: Charts opened from (or last saved to) the browser storage are saved back there
+		if (this.context.ChartFileHandle === null && this.BrowserChartID !== null)
+			return await this.SaveChartToBrowser(false);
 		if (this.context.ChartFileHandle === null)
 			return await this.OpenChartSaveAsDialog();
 		return await this.SaveChart(this.context.ChartFileHandle);
+	}
+
+	/** NOTE: Web port addition, saves the chart (and the song file if available) into the browser storage */
+	async SaveChartToBrowser(saveAsNew: boolean): Promise<boolean>
+	{
+		const context = this.context;
+		const fileName = this.GetSaveFileName();
+		try
+		{
+			const existing = (!saveAsNew && this.BrowserChartID !== null) ? await GetBrowserChart(this.BrowserChartID) : null;
+			const songFile = await this.FindSongFile(context.Chart.SongFileName);
+			// NOTE: Keep the previously stored song if it can't be found anymore (for example after reopening from the browser storage without a song folder)
+			const keepExistingSong = (songFile === null && existing !== null && existing.SongFileName === context.Chart.SongFileName);
+			const entry: BrowserChartEntry = {
+				ID: existing?.ID ?? NewBrowserChartID(),
+				FileName: fileName,
+				Title: context.Chart.ChartTitle[Language.Base],
+				TJAText: this.ConvertChartToTJAText(false),
+				SongFileName: context.Chart.SongFileName,
+				Song: (songFile !== null) ? songFile : keepExistingSong ? existing!.Song : null,
+				SavedAt: Date.now(),
+			};
+			await PutBrowserChart(entry);
+			this.BrowserChartID = entry.ID;
+			context.ChartFilePath = fileName;
+			context.Undo.ClearChangesWereMade();
+			this.SetStatus(`Saved '${fileName}' to browser storage` + ((entry.Song === null && entry.SongFileName.length > 0) ? " (without song file)" : ""));
+			return true;
+		}
+		catch (e)
+		{
+			console.error(e);
+			this.SetStatus(`Failed to save to browser storage: ${String(e)}`);
+			return false;
+		}
+	}
+
+	/** NOTE: Web port addition, opens a chart previously saved with SaveChartToBrowser() */
+	async OpenChartFromBrowser(id: string): Promise<boolean>
+	{
+		try
+		{
+			const entry = await GetBrowserChart(id);
+			if (entry === null)
+			{
+				this.SetStatus("Chart not found in browser storage");
+				return false;
+			}
+			const chartFile = new File([entry.TJAText], entry.FileName, { type: "text/plain" });
+			const siblingFiles = (entry.Song !== null) ? [new File([entry.Song], GetFileName(entry.SongFileName) || "song", { type: entry.Song.type })] : [];
+			await this.ImportChartFile(chartFile, null, siblingFiles);
+			this.BrowserChartID = entry.ID;
+			// NOTE: Charts saved by this editor never need a .bak backup
+			this.createBackupOfOriginalTJABeforeOverwriteSave = false;
+			return true;
+		}
+		catch (e)
+		{
+			console.error(e);
+			this.SetStatus(`Failed to open from browser storage: ${String(e)}`);
+			return false;
+		}
 	}
 
 	private AddRecentFile(path: string): void
@@ -332,6 +402,7 @@ export class ChartEditor
 		context.ChartFilePath = loadResult.ChartFilePath;
 		context.ChartFileHandle = handle;
 		this.ChartDirectoryHandle = directoryHandle;
+		this.BrowserChartID = null;
 		context.ChartDirectoryFiles.clear();
 		for (const sibling of siblingFiles)
 			context.ChartDirectoryFiles.set(NormalizePath((sibling as File & { webkitRelativePath?: string }).webkitRelativePath || sibling.name), sibling);

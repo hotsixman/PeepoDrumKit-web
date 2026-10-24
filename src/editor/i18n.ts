@@ -206,6 +206,18 @@ const JA: Record<string, string> = {
 	"Ported from PeepoDrumKit": "PeepoDrumKitのWeb移植",
 	"Close": "閉じる",
 	"Loading...": "読み込み中...",
+	"Save to Browser": "ブラウザに保存",
+	"Browser Storage...": "ブラウザ保存データ...",
+	"Browser Storage": "ブラウザ保存データ",
+	"Save (Overwrite)": "上書き保存",
+	"Save Current Chart": "現在の譜面を保存",
+	"Save as New": "新規として保存",
+	"No charts saved in this browser": "このブラウザに保存された譜面はありません",
+	"No song": "音源なし",
+	"Open": "開く",
+	"Confirm Delete": "本当に削除",
+	"Charts are stored only in this browser on this device.": "譜面はこの端末のこのブラウザにのみ保存されます。",
+	"Timeline Size": "タイムラインのサイズ",
 };
 
 const KO: Record<string, string> = {
@@ -439,6 +451,18 @@ const KO: Record<string, string> = {
 	"History": "히스토리",
 	"Lyrics Line": "가사 줄",
 	"Done": "완료",
+	"Save to Browser": "브라우저에 저장",
+	"Browser Storage...": "브라우저 저장소...",
+	"Browser Storage": "브라우저 저장소",
+	"Save (Overwrite)": "덮어쓰기 저장",
+	"Save Current Chart": "현재 채보 저장",
+	"Save as New": "새로 저장",
+	"No charts saved in this browser": "이 브라우저에 저장된 채보가 없습니다",
+	"No song": "음원 없음",
+	"Open": "열기",
+	"Confirm Delete": "정말 삭제",
+	"Charts are stored only in this browser on this device.": "채보는 이 기기의 이 브라우저에만 저장됩니다.",
+	"Timeline Size": "타임라인 크기",
 };
 
 const Tables: (Record<string, string> | null)[] = [null, JA, KO];

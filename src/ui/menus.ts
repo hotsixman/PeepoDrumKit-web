@@ -3,7 +3,7 @@
 import { editor, Invalidate, ui } from "./state.svelte";
 import { UI_Str, SetGuiLanguage, GuiLanguage, LanguageState } from "../editor/i18n";
 import { Settings, PersistentApp, SavePersistentApp, SaveUserSettings, ToShortcutString, type MultiInputBinding } from "../editor/settings";
-import { ClipboardAction, SelectionAction, TransformAction } from "../editor/timeline";
+import { ClipboardAction, SelectionAction, TransformAction, GuiScaleState } from "../editor/timeline";
 import { ToggleFullscreen, DownloadTextFile, UntitledChartFileName } from "../editor/editor";
 import { BuildDate } from "../editor/chart";
 import { DateToString } from "../core/types";
@@ -17,6 +17,8 @@ export interface MenuItem
 	Action?: () => void;
 	Submenu?: MenuItem[];
 	Separator?: boolean;
+	/** NOTE: Mobile menu sheet only, keep the sheet open after activating this item (for repeated stepping like the timeline size) */
+	KeepOpen?: boolean;
 }
 
 export interface Menu { Label: string; Items: MenuItem[]; }
@@ -66,6 +68,9 @@ export function BuildMenus(): Menu[]
 				{ Label: UI_Str("Save"), Shortcut: Key(input.Editor_ChartSave), Action: () => { void editor.TrySaveChartOrOpenSaveAsDialog().then(Invalidate); } },
 				{ Label: UI_Str("Save As..."), Shortcut: Key(input.Editor_ChartSaveAs), Action: () => { void editor.OpenChartSaveAsDialog().then(Invalidate); } },
 				{ Label: UI_Str("Download TJA"), Action: () => DownloadTextFile(context.ChartFilePath || UntitledChartFileName, editor.ConvertChartToTJAText(true)) },
+				Sep,
+				{ Label: UI_Str("Save to Browser"), Action: () => { void editor.SaveChartToBrowser(false).then(Invalidate); } },
+				{ Label: UI_Str("Browser Storage..."), Action: () => editor.OnRequestBrowserStorageDialog?.() },
 			],
 		},
 		{
@@ -133,10 +138,11 @@ export function BuildMenus(): Menu[]
 			Label: UI_Str("Window"), Items: [
 				{ Label: UI_Str("Toggle Fullscreen"), Shortcut: Key(input.Editor_ToggleFullscreen), Checked: document.fullscreenElement !== null, Action: ToggleFullscreen },
 				{
-					Label: UI_Str("DPI Scale"), Submenu: [
-						{ Label: UI_Str("Zoom In"), Shortcut: Key(input.Editor_IncreaseGuiScale), Enabled: editor.CanZoomInGuiScale(), Action: run(() => editor.ZoomInGuiScale()) },
-						{ Label: UI_Str("Zoom Out"), Shortcut: Key(input.Editor_DecreaseGuiScale), Enabled: editor.CanZoomOutGuiScale(), Action: run(() => editor.ZoomOutGuiScale()) },
-						{ Label: UI_Str("Reset Zoom"), Shortcut: Key(input.Editor_ResetGuiScale), Enabled: editor.CanZoomResetGuiScale(), Action: run(() => editor.ZoomResetGuiScale()) },
+					// NOTE: The GUI scale only affects the timeline in the web port, so on mobile it is presented as the (otherwise hidden) timeline size option
+					Label: `${UI_Str(ui.isMobile ? "Timeline Size" : "DPI Scale")} (${Math.round(GuiScaleState.Target * 100)}%)`, Submenu: [
+						{ Label: UI_Str("Zoom In"), Shortcut: Key(input.Editor_IncreaseGuiScale), Enabled: editor.CanZoomInGuiScale(), KeepOpen: true, Action: run(() => editor.ZoomInGuiScale()) },
+						{ Label: UI_Str("Zoom Out"), Shortcut: Key(input.Editor_DecreaseGuiScale), Enabled: editor.CanZoomOutGuiScale(), KeepOpen: true, Action: run(() => editor.ZoomOutGuiScale()) },
+						{ Label: UI_Str("Reset Zoom"), Shortcut: Key(input.Editor_ResetGuiScale), Enabled: editor.CanZoomResetGuiScale(), KeepOpen: true, Action: run(() => editor.ZoomResetGuiScale()) },
 					],
 				},
 				{ Label: UI_Str("Layout"), Submenu: [layoutItem("Automatic Layout", "auto"), layoutItem("Desktop Layout", "desktop"), layoutItem("Mobile Layout", "mobile")] },
