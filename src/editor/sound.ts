@@ -64,12 +64,13 @@ function SynthesizeSoundEffect(ctx: BaseAudioContext, type: SoundEffectType): Au
 		}
 	}
 
-	// NOTE: The default don / ka sounds are twice as loud, soft saturated instead of hard clipped to avoid harsh distortion on the loudest peaks
+	// NOTE: The default don / ka sounds are amplified and soft saturated instead of hard clipped to avoid harsh distortion on the loudest peaks,
+	//		 then scaled back down to the final output level
 	if (type === SoundEffectType.TaikoDon || type === SoundEffectType.TaikoKa)
 	{
-		const HitSoundGain = 2.0;
+		const HitSoundGain = 2.0, HitSoundOutputLevel = 0.7;
 		for (let i = 0; i < frameCount; i++)
-			out[i] = Math.tanh(out[i] * HitSoundGain);
+			out[i] = Math.tanh(out[i] * HitSoundGain) * HitSoundOutputLevel;
 	}
 	return buffer;
 }
