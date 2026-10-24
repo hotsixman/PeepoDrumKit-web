@@ -203,6 +203,8 @@ export class ChartGamePreview
 	{
 		this.Canvas = canvas;
 		this.Ctx = (canvas !== null) ? canvas.getContext("2d", { alpha: false, desynchronized: true }) : null;
+		// NOTE: A newly mounted canvas starts with the default backing size so it always has to be resized
+		this.CSSWidth = this.CSSHeight = 0;
 	}
 
 	private DrawGamePreviewNote(context: ChartContext, center: vec2, noteType: NoteType): void

@@ -48,6 +48,7 @@ button
 	border-radius: 2px;
 	padding: 2px 8px;
 	min-height: var(--frame-height);
+	font-size: 0.9em;
 	cursor: pointer;
 	touch-action: manipulation;
 	-webkit-tap-highlight-color: transparent;

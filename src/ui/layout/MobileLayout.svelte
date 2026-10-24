@@ -166,7 +166,7 @@
 			<button class="tool toggle" class:on={bigNote} onclick={() => (bigNote = !bigNote)}>{UI_Str("Big")}</button>
 		</div>
 		<div class="row">
-			<button class="tool toggle" class:on={selectMode} onclick={() => (selectMode = !selectMode)}>⬚ {UI_Str("Select Mode")}</button>
+			<button class="tool toggle" class:on={selectMode} onclick={() => (selectMode = !selectMode)}>{UI_Str("Select Mode")}</button>
 			<button class="tool toggle" class:on={data.rangeActive} onclick={act(() => timeline.StartEndRangeSelectionAtCursor(context))}>
 				{(!data.rangeActive || data.rangeHasEnd) ? "[ " + UI_Str("Range") : UI_Str("Range") + " ]"}
 			</button>
@@ -232,7 +232,7 @@
 <style>
 	.mobile { display: flex; flex-direction: column; height: 100%; position: relative; overflow: hidden; padding-bottom: env(safe-area-inset-bottom); }
 	.top-bar { flex: none; display: flex; align-items: center; gap: 4px; padding: 4px 6px; padding-top: max(4px, env(safe-area-inset-top)); background: var(--menubar); }
-	.icon { width: 40px; height: 36px; padding: 0; font-size: 1.2em; background: transparent; border: none; }
+	.icon { width: 40px; height: 36px; padding: 0; font-size: 1.05em; background: transparent; border: none; }
 	.icon.on { color: var(--accent); }
 	.title { flex: 1; min-width: 0; display: flex; flex-direction: column; line-height: 1.15; }
 	.name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
@@ -245,13 +245,13 @@
 	.hint { flex: none; background: var(--header-active); padding: 4px 8px; font-size: 0.85em; text-align: center; }
 	.toolbar { flex: none; display: flex; flex-direction: column; gap: 4px; padding: 6px; background: var(--window); border-top: 1px solid var(--border); }
 	.row { display: flex; gap: 4px; align-items: center; }
-	.tool { flex: 1; height: 38px; padding: 0 4px; min-width: 0; font-size: 1.05em; }
+	.tool { flex: 1; height: 38px; padding: 0 4px; min-width: 0; font-size: 0.85em; line-height: 1.1; overflow: hidden; }
 	.tool.small { flex: 0.6; }
-	.tool.toggle { font-size: 0.9em; }
+	.tool.toggle { font-size: 0.72em; }
 	.tool.on, .note.on { background: var(--header-active); border-color: var(--accent); }
 	.tool.play { flex: 1.3; }
-	.value { flex: none; min-width: 44px; text-align: center; font-variant-numeric: tabular-nums; font-size: 0.9em; }
-	.notes .note { flex: 1; height: 48px; font-weight: 700; font-size: 1.05em; color: #fff; border: 2px solid #1e1e1e; border-radius: 24px; }
+	.value { flex: none; min-width: 44px; text-align: center; font-variant-numeric: tabular-nums; font-size: 0.8em; }
+	.notes .note { flex: 1; height: 48px; font-weight: 700; font-size: 0.9em; color: #fff; border: 2px solid #1e1e1e; border-radius: 24px; }
 	.note.don { background: #f3412b; }
 	.note.ka { background: #51c3c2; }
 	.note.roll { background: #f4b713; color: #1e1e1e; }

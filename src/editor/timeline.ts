@@ -368,11 +368,14 @@ export class ChartTimeline
 	{
 		this.Canvas = canvas;
 		this.Ctx = (canvas !== null) ? canvas.getContext("2d", { alpha: false, desynchronized: true }) : null;
+		// NOTE: A newly mounted canvas starts with the default backing size so it always has to be resized
+		this.CanvasCSSWidth = this.CanvasCSSHeight = 0;
 	}
 
 	private ForEachTimelineRow(perRowFunc: (it: ForEachRowData) => void): void
 	{
-		let localY = 0.0;
+		// NOTE: Rows are offset by the vertical camera position so that they can be scrolled when they don't fit inside the content region
+		let localY = -Math.round(this.Camera.PositionCurrent.y);
 		for (let rowType = 0; rowType < TimelineRowType.Count; rowType++)
 		{
 			// HACK: Draw the non default branches smaller for now to waste less space (might wanna rethink all of this...)
@@ -388,6 +391,14 @@ export class ChartTimeline
 		let totalHeight = 0.0;
 		this.ForEachTimelineRow((it) => { totalHeight += it.LocalHeight; });
 		return totalHeight;
+	}
+
+	private ClampCameraScrollY(): void
+	{
+		const maxScrollY = Math.max(0.0, this.GetTotalTimelineRowsHeight() - this.Regions.Content.GetHeight());
+		const camera = this.Camera;
+		camera.PositionTarget.y = Clamp(camera.PositionTarget.y, 0.0, maxScrollY);
+		camera.PositionCurrent.y = Clamp(camera.PositionCurrent.y, 0.0, maxScrollY);
 	}
 
 	private ForEachTimelineVisibleGridLine(context: ChartContext, visibleTimeOverdraw: Time, perGridFunc: (it: ForEachGridLineData) => void): void
@@ -573,7 +584,7 @@ export class ChartTimeline
 		const rowsHeight = this.GetTotalTimelineRowsHeight();
 		const minAmplitude = (2.0 / rowsHeight);
 		const amplitudes = this.waveformAmplitudeBuffer;
-		const screenTL = this.LocalToScreenSpace(V2(0.0, 0.5));
+		const screenTL = this.LocalToScreenSpace(V2(0.0, 0.5 - Math.round(camera.PositionCurrent.y)));
 
 		const isAnimating = (camera.ZoomCurrent.x !== camera.ZoomTarget.x) || (waveformAnimationScale < 0.999);
 		if (isAnimating)
@@ -1666,7 +1677,7 @@ export class ChartTimeline
 
 			if (this.IsSidebarWindowHovered)
 			{
-				// NOTE: Not needed at the moment for small number of rows
+				camera.PositionTarget.y -= (io.MouseWheel * scrollStep.y);
 			}
 			else if (this.IsContentHeaderWindowHovered || this.IsContentWindowHovered)
 			{
@@ -2249,6 +2260,7 @@ export class ChartTimeline
 		const dt = Input.DeltaTime;
 
 		// BUG: Freaks out when zoomed in too far / the timeline is too long (16min song for example) float precision issue (?)
+		this.ClampCameraScrollY();
 		this.Camera.UpdateAnimations(dt);
 		context.SongWaveformFadeAnimationCurrent = AnimateExponentialF32(context.SongWaveformFadeAnimationCurrent, context.SongWaveformFadeAnimationTarget, Settings.Animation.TimelineWaveformFadeSpeed, dt);
 		this.RangeSelectionExpansionAnimationCurrent = AnimateExponentialF32(this.RangeSelectionExpansionAnimationCurrent, this.RangeSelectionExpansionAnimationTarget, Settings.Animation.TimelineRangeSelectionExpansionSpeed, dt);
@@ -2529,8 +2541,8 @@ export class ChartTimeline
 			const visibleTime = this.GetMinMaxVisibleTime(visibleTimeOverdraw);
 			d.SetFont(GuiScale(FontBaseSizeMedium));
 
-			// NOTE: Row label text
-			d.PushClipRect(R.Sidebar.TL, R.Sidebar.BR);
+			// NOTE: Row label text (clipped to the content height so that vertically scrolled rows don't overlap the scrollbar area)
+			d.PushClipRect(R.Sidebar.TL, V2(R.Sidebar.BR.x, R.Content.BR.y));
 			this.ForEachTimelineRow((rowIt) =>
 			{
 				const sidebarScreenSpaceTL = this.LocalToScreenSpace_Sidebar(V2(0.0, rowIt.LocalY));

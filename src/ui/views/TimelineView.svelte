@@ -27,7 +27,7 @@
 	const touches = new Map<number, TouchState>();
 	let gesture: "none" | "pending" | "pan" | "pinch" | "box" | "mouse" = "none";
 	let longPressTimer = 0;
-	let panStartCameraX = 0, panVelocity = 0, panLastTime = 0;
+	let panStartCameraX = 0, panStartCameraY = 0, panVelocity = 0, panLastTime = 0;
 	let pinchStartDistance = 1, pinchStartZoom = 1, pinchStartCenter: vec2 = { x: 0, y: 0 }, pinchStartCameraX = 0;
 
 	const local = (e: PointerEvent): vec2 => { const r = canvas!.getBoundingClientRect(); return { x: e.clientX - r.left, y: e.clientY - r.top }; };
@@ -72,6 +72,7 @@
 
 			gesture = "pending";
 			panStartCameraX = timeline.Camera.PositionTarget.x;
+			panStartCameraY = timeline.Camera.PositionTarget.y;
 			panVelocity = 0; panLastTime = performance.now();
 			clearLongPress();
 			longPressTimer = window.setTimeout(() =>
@@ -120,6 +121,8 @@
 			panVelocity = panVelocity * 0.6 + (-dx / dt) * 0.4;
 			panLastTime = now;
 			camera.PositionTarget.x = camera.PositionCurrent.x = panStartCameraX - (pos.x - state.start.x);
+			// NOTE: Vertical scrolling for when the rows don't fit (clamped by the timeline)
+			camera.PositionTarget.y = camera.PositionCurrent.y = panStartCameraY - (pos.y - state.start.y);
 		}
 		else if (gesture === "pinch" && touches.size >= 2)
 		{
@@ -170,6 +173,7 @@
 			const remaining = touches.values().next().value!;
 			remaining.start = remaining.last;
 			panStartCameraX = timeline.Camera.PositionTarget.x;
+			panStartCameraY = timeline.Camera.PositionTarget.y;
 			gesture = "pan";
 		}
 	}
