@@ -1,0 +1,79 @@
+/* NOTE: Colors based on "GuiStyleColorPeepoDrumKit()" (peepo_drum_kit/chart_editor_theme.h) */
+:root
+{
+	color-scheme: dark;
+	--text: #f0f0f0;
+	--text-dim: #808080;
+	--window: #1f1f1f;
+	--popup: #262626;
+	--border: #171717;
+	--border-light: #3b3b3b;
+	--frame: rgba(54, 54, 54, 0.54);
+	--frame-hover: rgba(69, 69, 69, 0.64);
+	--title: #1c1c1c;
+	--title-active: #212121;
+	--menubar: #242424;
+	--button: rgba(115, 115, 115, 0.4);
+	--button-hover: rgba(150, 150, 150, 0.4);
+	--button-active: rgba(92, 92, 92, 0.4);
+	--header: #303030;
+	--header-hover: #454545;
+	--header-active: #3b3b3b;
+	--separator: rgba(125, 125, 125, 0.5);
+	--separator-active: rgba(99, 171, 46, 0.78);
+	--tab: #292929;
+	--tab-hover: #38402e;
+	--tab-active: #4d6929;
+	--accent: #80bf36;
+	--warning: #ff4c4c;
+	--drag-hover: #dbddbc;
+	--drag-active: #f2f5c3;
+	--frame-height: 24px;
+	font-family: "Noto Sans JP", "Noto Sans KR", "Noto Sans", "Segoe UI", system-ui, sans-serif;
+	font-size: 14px;
+	color: var(--text);
+	background: var(--window);
+	-webkit-text-size-adjust: 100%;
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; height: 100%; overflow: hidden; overscroll-behavior: none; background: var(--window); }
+#app { height: 100%; }
+
+button, input, select, textarea { font: inherit; color: inherit; }
+button
+{
+	background: var(--button);
+	border: 1px solid transparent;
+	border-radius: 2px;
+	padding: 2px 8px;
+	min-height: var(--frame-height);
+	cursor: pointer;
+	touch-action: manipulation;
+	-webkit-tap-highlight-color: transparent;
+}
+button:hover:not(:disabled) { background: var(--button-hover); }
+button:active:not(:disabled) { background: var(--button-active); }
+button:disabled { opacity: 0.45; cursor: default; }
+input[type="text"], input[type="number"], input:not([type]), select, textarea
+{
+	background: var(--frame);
+	border: 1px solid transparent;
+	border-radius: 2px;
+	padding: 2px 6px;
+	min-height: var(--frame-height);
+	min-width: 0;
+}
+input:focus, select:focus, textarea:focus { outline: 1px solid var(--accent); }
+input[type="checkbox"] { accent-color: #5e8f2e; width: 16px; height: 16px; }
+input[type="range"] { accent-color: #598530; }
+select option { background: var(--popup); }
+
+.panel-scroll { height: 100%; overflow-y: auto; overflow-x: hidden; padding: 2px; }
+
+::-webkit-scrollbar { width: 12px; height: 12px; }
+::-webkit-scrollbar-track { background: rgba(31, 31, 31, 0.53); }
+::-webkit-scrollbar-thumb { background: #4f4f4f; border-radius: 6px; border: 3px solid transparent; background-clip: padding-box; }
+::-webkit-scrollbar-thumb:hover { background-color: #696969; }
+
+.app.mobile { --frame-height: 34px; font-size: 15px; }
