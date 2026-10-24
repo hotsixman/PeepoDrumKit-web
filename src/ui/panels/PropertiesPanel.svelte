@@ -4,6 +4,7 @@
 	import { UI_Str } from "../../editor/i18n";
 	import { Language, DifficultyTypeNames, DifficultyLevelMin, DifficultyLevelMax } from "../../editor/chart";
 	import { ToPercent, FromPercent, Clamp } from "../../core/types";
+	import { Settings, SaveUserSettings } from "../../editor/settings";
 	import Section from "../widgets/Section.svelte";
 	import PropertyTable from "../widgets/PropertyTable.svelte";
 
@@ -20,6 +21,7 @@
 			songFileName: chart.SongFileName, songVolume: chart.SongVolume, sfxVolume: chart.SoundEffectVolume,
 			courseType: course.Type, courseLevel: course.Level, courseCreator: course.CourseCreator,
 			isLoading: editor.isSongAsyncLoading,
+			previewHitVolume: Settings.Audio.PreviewHitSoundVolume,
 		};
 	});
 
@@ -65,6 +67,15 @@
 				<input type="range" min={ToPercent(MinVolume)} max={ToPercent(MaxVolumeSoftLimit)} step="1" value={ToPercent(data.sfxVolume)}
 					oninput={(e) => { context.Chart.SoundEffectVolume = Clamp(FromPercent(parseFloat(e.currentTarget.value)), MinVolume, MaxVolumeHardLimit); changed(); }} />
 				<span class="slider-value">{ToPercent(data.sfxVolume).toFixed(0)}%</span>
+			</div>
+
+			<!-- NOTE: Web port addition, editor only preview volume for the don / ka sounds, not saved to the chart (unlike SEVOL above) -->
+			<div class="prop-label" title={UI_Str("Editor only, not saved to the TJA file (SEVOL)")}>{UI_Str("Preview Hit Volume")}</div>
+			<div class="prop-value row">
+				<input type="range" min="0" max="200" step="1" value={ToPercent(data.previewHitVolume)}
+					oninput={(e) => { Settings.Audio.PreviewHitSoundVolume = Clamp(FromPercent(parseFloat(e.currentTarget.value)), 0.0, 2.0); Invalidate(); }}
+					onchange={() => SaveUserSettings()} />
+				<span class="slider-value">{ToPercent(data.previewHitVolume).toFixed(0)}%</span>
 			</div>
 		</PropertyTable>
 	</Section>

@@ -55,6 +55,8 @@ function MakeDefaultUserSettings()
 			OpenDeviceOnStartup: true,
 			CloseDeviceOnIdleFocusLoss: false,
 			RequestLowLatency: true,
+			// NOTE: Web port addition, editor only don / ka preview volume multiplier (doesn't change the chart SEVOL)
+			PreviewHitSoundVolume: 1.0,
 		},
 		Animation:
 		{

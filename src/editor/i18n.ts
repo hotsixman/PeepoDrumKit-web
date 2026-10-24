@@ -218,6 +218,8 @@ const JA: Record<string, string> = {
 	"Confirm Delete": "本当に削除",
 	"Charts are stored only in this browser on this device.": "譜面はこの端末のこのブラウザにのみ保存されます。",
 	"Timeline Size": "タイムラインのサイズ",
+	"Preview Hit Volume": "プレビュー打撃音量",
+	"Editor only, not saved to the TJA file (SEVOL)": "エディター専用、TJAファイル(SEVOL)には保存されません",
 };
 
 const KO: Record<string, string> = {
@@ -463,6 +465,8 @@ const KO: Record<string, string> = {
 	"Confirm Delete": "정말 삭제",
 	"Charts are stored only in this browser on this device.": "채보는 이 기기의 이 브라우저에만 저장됩니다.",
 	"Timeline Size": "타임라인 크기",
+	"Preview Hit Volume": "미리보기 타격음 볼륨",
+	"Editor only, not saved to the TJA file (SEVOL)": "에디터 전용, TJA 파일(SEVOL)에는 저장되지 않음",
 };
 
 const Tables: (Record<string, string> | null)[] = [null, JA, KO];

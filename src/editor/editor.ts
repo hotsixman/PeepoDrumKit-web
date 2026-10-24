@@ -694,6 +694,7 @@ export class ChartEditor
 		// NOTE: Apply volume
 		context.SongVoice.SetVolume(context.Chart.SongVolume);
 		context.SfxVoicePool.BaseVolumeSfx = context.Chart.SoundEffectVolume;
+		context.SfxVoicePool.BaseVolumeHitPreview = Settings.Audio.PreviewHitSoundVolume;
 
 		// NOTE: Must always point to a valid course
 		if (context.Chart.Courses.length === 0)

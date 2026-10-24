@@ -11,7 +11,7 @@ export enum SoundEffectType { TaikoDon, TaikoKa, MetronomeBar, MetronomeBeat, Co
 function SynthesizeSoundEffect(ctx: BaseAudioContext, type: SoundEffectType): AudioBuffer
 {
 	const sampleRate = ctx.sampleRate;
-	const duration = (type === SoundEffectType.TaikoDon) ? 0.35 : (type === SoundEffectType.TaikoKa) ? 0.18 : 0.06;
+	const duration = (type === SoundEffectType.TaikoDon) ? 0.35 : (type === SoundEffectType.TaikoKa) ? 0.22 : 0.06;
 	const frameCount = Math.ceil(duration * sampleRate);
 	const buffer = ctx.createBuffer(1, frameCount, sampleRate);
 	const out = buffer.getChannelData(0);
@@ -38,18 +38,19 @@ function SynthesizeSoundEffect(ctx: BaseAudioContext, type: SoundEffectType): Au
 	}
 	else if (type === SoundEffectType.TaikoKa)
 	{
-		// NOTE: Bright wooden rim click
-		let phaseA = 0.0, phaseB = 0.0, hp = 0.0, last = 0.0;
+		// NOTE: High pitched drum (small tight membrane) with a slight downward pitch bend, an inharmonic membrane mode and a short stick attack
+		let phase = 0.0, hp = 0.0, last = 0.0;
 		for (let i = 0; i < frameCount; i++)
 		{
 			const t = i / sampleRate;
-			phaseA += (2.0 * Math.PI * 1180.0) / sampleRate;
-			phaseB += (2.0 * Math.PI * 1830.0) / sampleRate;
+			const freq = 440.0 + 260.0 * Math.exp(-t * 45.0);
+			phase += (2.0 * Math.PI * freq) / sampleRate;
+			const body = Math.sin(phase) * Math.exp(-t * 18.0);
+			const overtone = Math.sin(phase * 1.59) * 0.35 * Math.exp(-t * 32.0);
 			const n = noise();
-			hp = 0.85 * (hp + n - last); last = n;
-			const tone = (Math.sin(phaseA) * 0.7 + Math.sin(phaseB) * 0.45) * Math.exp(-t * 42.0);
-			const click = hp * 0.8 * Math.exp(-t * 120.0);
-			out[i] = (tone + click) * 0.7;
+			hp = 0.8 * (hp + n - last); last = n;
+			const attack = hp * 0.9 * Math.exp(-t * 160.0);
+			out[i] = (body + overtone + attack) * 0.8;
 		}
 	}
 	else
@@ -62,6 +63,14 @@ function SynthesizeSoundEffect(ctx: BaseAudioContext, type: SoundEffectType): Au
 			out[i] = Math.sin(2.0 * Math.PI * freq * t) * envelope * 0.6;
 		}
 	}
+
+	// NOTE: The default don / ka sounds are twice as loud, soft saturated instead of hard clipped to avoid harsh distortion on the loudest peaks
+	if (type === SoundEffectType.TaikoDon || type === SoundEffectType.TaikoKa)
+	{
+		const HitSoundGain = 2.0;
+		for (let i = 0; i < frameCount; i++)
+			out[i] = Math.tanh(out[i] * HitSoundGain);
+	}
 	return buffer;
 }
 
@@ -72,6 +81,8 @@ export class SoundEffectsVoicePool
 	BaseVolumeMaster = 1.0;
 	BaseVolumeSfx = 1.0;
 	BaseVolumeMetronome = 1.0;
+	// NOTE: Web port addition, editor only volume for the don / ka preview sounds (independent from the chart SEVOL stored in the TJA)
+	BaseVolumeHitPreview = 1.0;
 	static readonly VoicePoolSize = 32;
 	VoicePoolRingIndex = 0;
 	VoicePool: (ActiveVoice | null)[] = new Array(SoundEffectsVoicePool.VoicePoolSize).fill(null);
@@ -126,7 +137,7 @@ export class SoundEffectsVoicePool
 				voiceVolume = 1.0;
 		}
 
-		voiceVolume = isMetronome ? (voiceVolume * this.BaseVolumeMetronome) : (voiceVolume * this.BaseVolumeSfx);
+		voiceVolume = isMetronome ? (voiceVolume * this.BaseVolumeMetronome) : (voiceVolume * this.BaseVolumeSfx * this.BaseVolumeHitPreview);
 		voiceVolume *= this.BaseVolumeMaster;
 
 		const sourceBuffer = this.TryGetSourceForType(type);
