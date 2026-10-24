@@ -32,6 +32,10 @@
 
 화면 폭에 따라 레이아웃이 자동으로 선택되며, 메뉴의 Window 항목에서 수동으로 전환할 수 있습니다.
 
+## 데모
+
+https://hotsixman.github.io/peepo-web/
+
 ## 개발
 
 ```sh
@@ -41,6 +45,9 @@ npm run build    # dist/ 에 정적 빌드
 npm run check    # svelte-check (타입 검사)
 npm test         # vitest (TJA 파서 / 라운드트립 테스트)
 ```
+
+`main` 브랜치에 푸시하면 GitHub Actions(`.github/workflows/deploy.yml`)가 빌드하여 GitHub Pages에 배포합니다.
+(저장소 Settings → Pages → Source를 **GitHub Actions**로 설정해야 합니다.)
 
 ## 원본과의 차이점
 
