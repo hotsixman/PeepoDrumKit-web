@@ -49,6 +49,9 @@ button
 	padding: 2px 8px;
 	min-height: var(--frame-height);
 	font-size: 0.9em;
+	/* NOTE: Only wrap at spaces (keep-all also keeps Korean / Japanese words together instead of breaking between characters) */
+	word-break: keep-all;
+	overflow-wrap: normal;
 	cursor: pointer;
 	touch-action: manipulation;
 	-webkit-tap-highlight-color: transparent;
