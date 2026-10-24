@@ -34,7 +34,7 @@
 
 ## 데모
 
-https://hotsixman.github.io/peepo-web/
+https://hotsixman.github.io/PeepoDrumKit-web/
 
 ## 개발
 
