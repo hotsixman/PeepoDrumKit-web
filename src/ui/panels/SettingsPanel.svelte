@@ -18,7 +18,7 @@
 	}
 
 	const generalBools: (keyof typeof Settings.General)[] = ["DisplayTimeInSongSpace", "TimelineAdvanceCursorAfterPlacingNote", "TimelineScrollInvertMouseWheel", "TimelineScrubAutoScrollEnableClamp", "DisableTempoWindowWidgetsIfHasSelection", "ConvertSelectionToScrollChanges_UnselectOld", "ConvertSelectionToScrollChanges_SelectNew"];
-	const generalNumbers: (keyof typeof Settings.General)[] = ["DrumrollAutoHitBarDivision", "TimelineScrollDistancePerMouseWheelTick", "TimelineScrollDistancePerMouseWheelTickFast", "TimelineZoomFactorPerMouseWheelTick", "TimelineScrubAutoScrollPixelThreshold", "TimelineScrubAutoScrollSpeedMin", "TimelineScrubAutoScrollSpeedMax"];
+	const generalNumbers: (keyof typeof Settings.General)[] = ["AutoSaveIntervalMinutes", "DrumrollAutoHitBarDivision", "TimelineScrollDistancePerMouseWheelTick", "TimelineScrollDistancePerMouseWheelTickFast", "TimelineZoomFactorPerMouseWheelTick", "TimelineScrubAutoScrollPixelThreshold", "TimelineScrubAutoScrollSpeedMin", "TimelineScrubAutoScrollSpeedMax"];
 	const animationNumbers: (keyof typeof Settings.Animation)[] = ["TimelineSmoothScrollSpeed", "TimelineWaveformFadeSpeed", "TimelineRangeSelectionExpansionSpeed", "TimelineWorldSpaceCursorXSpeed", "TimelineGridSnapLineSpeed", "TimelineGoGoRangeExpansionSpeed"];
 	const prettify = (key: string) => key.replace(/_/g, " ").replace(/([a-z])([A-Z])/g, "$1 $2");
 
@@ -66,8 +66,8 @@
 				<div class="prop-value row"><input type="checkbox" checked={data.general[key] as boolean} onchange={(e) => set("General", key, e.currentTarget.checked)} /></div>
 			{/each}
 			{#each generalNumbers as key}
-				<div class="prop-label">{prettify(key)}</div>
-				<div class="prop-value"><input type="number" step="any" value={data.general[key] as number} onchange={(e) => { const v = parseFloat(e.currentTarget.value); if (Number.isFinite(v)) set("General", key, (key === "DrumrollAutoHitBarDivision") ? Math.max(1, Math.trunc(v)) : v); }} /></div>
+				<div class="prop-label">{(key === "AutoSaveIntervalMinutes") ? UI_Str("Autosave Interval (minutes, 0 = off)") : prettify(key)}</div>
+				<div class="prop-value"><input type="number" step="any" value={data.general[key] as number} onchange={(e) => { const v = parseFloat(e.currentTarget.value); if (Number.isFinite(v)) set("General", key, (key === "DrumrollAutoHitBarDivision") ? Math.max(1, Math.trunc(v)) : (key === "AutoSaveIntervalMinutes") ? Math.max(0, v) : v); }} /></div>
 			{/each}
 			<div class="prop-label">Custom Selection Patterns</div>
 			<div class="prop-value">

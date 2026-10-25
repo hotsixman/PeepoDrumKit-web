@@ -221,6 +221,11 @@ const JA: Record<string, string> = {
 	"Preview Hit Volume": "プレビュー打撃音量",
 	"Editor only, not saved to the TJA file (SEVOL)": "エディター専用、TJAファイル(SEVOL)には保存されません",
 	"Grid Division": "グリッド分割",
+	"Recover Unsaved Chart": "未保存の譜面を復元",
+	"An automatic backup of unsaved changes was found.": "未保存の変更の自動バックアップが見つかりました。",
+	"Recover": "復元",
+	"Discard": "破棄",
+	"Autosave Interval (minutes, 0 = off)": "自動保存の間隔（分、0 = オフ）",
 };
 
 const KO: Record<string, string> = {
@@ -468,6 +473,11 @@ const KO: Record<string, string> = {
 	"Timeline Size": "타임라인 크기",
 	"Preview Hit Volume": "미리보기 타격음 볼륨",
 	"Editor only, not saved to the TJA file (SEVOL)": "에디터 전용, TJA 파일(SEVOL)에는 저장되지 않음",
+	"Recover Unsaved Chart": "저장하지 않은 채보 복구",
+	"An automatic backup of unsaved changes was found.": "저장하지 않은 변경 사항의 자동 백업이 있습니다.",
+	"Recover": "복구",
+	"Discard": "버리기",
+	"Autosave Interval (minutes, 0 = off)": "자동 저장 간격 (분, 0 = 끔)",
 };
 
 const Tables: (Record<string, string> | null)[] = [null, JA, KO];

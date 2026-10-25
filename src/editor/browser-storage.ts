@@ -24,8 +24,11 @@ export interface BrowserChartInfo
 }
 
 const DatabaseName = "PeepoDrumKitWeb";
-const DatabaseVersion = 1;
+const DatabaseVersion = 2;
 const ChartStoreName = "charts";
+// NOTE: Version 2, single slot automatic backup of the current (unsaved) chart. The song is stored separately so it only has to be written when it changes
+const AutosaveStoreName = "autosave";
+const AutosaveChartKey = "chart", AutosaveSongKey = "song";
 
 let databasePromise: Promise<IDBDatabase> | null = null;
 
@@ -42,6 +45,8 @@ function OpenDatabase(): Promise<IDBDatabase>
 				const db = request.result;
 				if (!db.objectStoreNames.contains(ChartStoreName))
 					db.createObjectStore(ChartStoreName, { keyPath: "ID" });
+				if (!db.objectStoreNames.contains(AutosaveStoreName))
+					db.createObjectStore(AutosaveStoreName, { keyPath: "ID" });
 			};
 			request.onsuccess = () => resolve(request.result);
 			request.onerror = () => reject(request.error);
@@ -61,11 +66,11 @@ function RequestToPromise<T>(request: IDBRequest<T>): Promise<T>
 	});
 }
 
-async function WithStore<T>(mode: IDBTransactionMode, fn: (store: IDBObjectStore) => IDBRequest<T>): Promise<T>
+async function WithStore<T>(mode: IDBTransactionMode, fn: (store: IDBObjectStore) => IDBRequest<T>, storeName: string = ChartStoreName): Promise<T>
 {
 	const db = await OpenDatabase();
-	const transaction = db.transaction(ChartStoreName, mode);
-	const result = await RequestToPromise(fn(transaction.objectStore(ChartStoreName)));
+	const transaction = db.transaction(storeName, mode);
+	const result = await RequestToPromise(fn(transaction.objectStore(storeName)));
 	if (mode === "readwrite")
 	{
 		await new Promise<void>((resolve, reject) =>
@@ -106,6 +111,43 @@ export async function ListBrowserCharts(): Promise<BrowserChartInfo[]>
 	return entries
 		.map((it): BrowserChartInfo => ({ ID: it.ID, FileName: it.FileName, Title: it.Title, SongFileName: it.SongFileName, SongSize: it.Song?.size ?? 0, TJASize: it.TJAText.length, SavedAt: it.SavedAt }))
 		.sort((a, b) => b.SavedAt - a.SavedAt);
+}
+
+export interface AutosaveEntry
+{
+	FileName: string;
+	Title: string;
+	TJAText: string;
+	SongFileName: string;
+	// NOTE: Path / browser storage entry the chart was opened from, restored together with the chart
+	ChartFilePath: string;
+	BrowserChartID: string | null;
+	SavedAt: number;
+}
+
+interface AutosaveSongRecord { ID: string; SongKey: string; Song: Blob | null; }
+
+/** NOTE: "song" is only written when it is not undefined (unchanged since the last autosave) */
+export async function PutAutosave(entry: AutosaveEntry, song?: { SongKey: string; Song: Blob | null }): Promise<void>
+{
+	try { await navigator.storage?.persist?.(); } catch { /* ... */ }
+	if (song !== undefined)
+		await WithStore("readwrite", (store) => store.put({ ID: AutosaveSongKey, SongKey: song.SongKey, Song: song.Song } satisfies AutosaveSongRecord), AutosaveStoreName);
+	await WithStore("readwrite", (store) => store.put({ ID: AutosaveChartKey, ...entry }), AutosaveStoreName);
+}
+
+export async function GetAutosave(): Promise<{ Entry: AutosaveEntry; Song: Blob | null } | null>
+{
+	const entry = await WithStore<(AutosaveEntry & { ID: string }) | undefined>("readonly", (store) => store.get(AutosaveChartKey), AutosaveStoreName);
+	if (entry === undefined)
+		return null;
+	const song = await WithStore<AutosaveSongRecord | undefined>("readonly", (store) => store.get(AutosaveSongKey), AutosaveStoreName);
+	return { Entry: entry, Song: song?.Song ?? null };
+}
+
+export async function ClearAutosave(): Promise<void>
+{
+	await WithStore("readwrite", (store) => store.clear(), AutosaveStoreName);
 }
 
 export async function GetBrowserStorageEstimate(): Promise<{ Usage: number; Quota: number } | null>

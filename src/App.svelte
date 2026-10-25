@@ -7,6 +7,7 @@
 	import MobileLayout from "./ui/layout/MobileLayout.svelte";
 	import ConfirmDialog from "./ui/layout/ConfirmDialog.svelte";
 	import BrowserStorageDialog from "./ui/layout/BrowserStorageDialog.svelte";
+	import AutosaveRecoveryDialog from "./ui/layout/AutosaveRecoveryDialog.svelte";
 
 	// NOTE: Restore the last used gui language
 	{
@@ -53,6 +54,11 @@
 		editor.OnRequestOpenAudioDialog = () => audioInput?.click();
 		editor.OnRequestOpenFolderDialog = () => folderInput?.click();
 		editor.OnRequestBrowserStorageDialog = () => { browserStorageOpen = true; };
+		void editor.CheckForAutosaveRecovery().then(Invalidate);
+		// NOTE: Back up unsaved changes right away when the page gets hidden (switching apps / tabs on mobile, closing the tab)
+		const onVisibilityChange = () => { if (document.visibilityState === "hidden") void editor.AutosaveNow(); };
+		document.addEventListener("visibilitychange", onVisibilityChange);
+		window.addEventListener("pagehide", onVisibilityChange);
 
 		let raf = 0, lastTime = performance.now(), lastSignature = "", lastChartVersion = -1, lastTitle = "";
 		let fpsAccumTime = 0, fpsFrames = 0;
@@ -81,7 +87,7 @@
 		const onBeforeUnload = (e: BeforeUnloadEvent) => { if (editor.context.Undo.HasPendingChanges) { e.preventDefault(); e.returnValue = ""; } };
 		window.addEventListener("beforeunload", onBeforeUnload);
 
-		return () => { cancelAnimationFrame(raf); Input.Detach(); window.removeEventListener("beforeunload", onBeforeUnload); editor.Dispose(); };
+		return () => { cancelAnimationFrame(raf); Input.Detach(); window.removeEventListener("beforeunload", onBeforeUnload); document.removeEventListener("visibilitychange", onVisibilityChange); window.removeEventListener("pagehide", onVisibilityChange); editor.Dispose(); };
 	});
 
 	function onFilesPicked(input: HTMLInputElement | undefined): void
@@ -114,6 +120,7 @@
 		<DesktopLayout />
 	{/if}
 	<ConfirmDialog />
+	<AutosaveRecoveryDialog />
 	<BrowserStorageDialog open={browserStorageOpen} onclose={() => (browserStorageOpen = false)} />
 	{#if dragOver}
 		<div class="drop-overlay">{UI_Str("Drop a .tja or audio file here")}</div>

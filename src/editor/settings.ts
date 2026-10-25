@@ -30,6 +30,8 @@ function MakeDefaultUserSettings()
 			DrumrollAutoHitBarDivision: 16,
 			DisplayTimeInSongSpace: false,
 			TimelineScrollInvertMouseWheel: false,
+			// NOTE: Web port addition, minutes between automatic backups of unsaved changes into the browser storage (0 = disabled)
+			AutoSaveIntervalMinutes: 1,
 			// NOTE: Web port addition, step the cursor to the next grid line after placing a don / ka note (while paused)
 			TimelineAdvanceCursorAfterPlacingNote: true,
 			TimelineScrollDistancePerMouseWheelTick: 100.0,

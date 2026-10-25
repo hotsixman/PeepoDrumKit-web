@@ -18,7 +18,7 @@ import type { WaveformWorkerRequest, WaveformWorkerResponse } from "../audio/wav
 import { TempoTapCalculator } from "./tempo-calculator";
 import { LanguageState } from "./i18n";
 import { SettingsVersion } from "./settings";
-import { type BrowserChartEntry, NewBrowserChartID, PutBrowserChart, GetBrowserChart } from "./browser-storage";
+import { type BrowserChartEntry, NewBrowserChartID, PutBrowserChart, GetBrowserChart, PutAutosave, GetAutosave, ClearAutosave, type AutosaveEntry } from "./browser-storage";
 
 export const UntitledChartFileName = "Untitled Chart.tja";
 export const SupportedAudioExtensions = [".flac", ".ogg", ".mp3", ".wav", ".m4a", ".aac", ".opus", ".webm"];
@@ -104,6 +104,15 @@ export class ChartEditor
 	OnRequestFocusSettings: (() => void) | null = null;
 	OnRequestFocusHelp: (() => void) | null = null;
 	OnRequestBrowserStorageDialog: (() => void) | null = null;
+
+	// NOTE: Web port addition, periodic automatic backup of the current chart into the browser storage (see UpdateAutosave())
+	PendingAutosaveRecovery: { FileName: string; Title: string; SavedAt: number } | null = null;
+	LastAutosaveTime = 0;
+	private lastAutosaveUndoVersion = -1;
+	private lastAutosaveElapsedCheck = performance.now();
+	private autosavedSongKey = "";
+	private isAutosaving = false;
+	private suppressAutosaveClear = false;
 	// NOTE: Per frame callbacks for UI components that need to poll the input state (called after the main update)
 	FrameHooks = new Set<() => void>();
 
@@ -184,6 +193,7 @@ export class ChartEditor
 		context.ChartDirectoryFiles.clear();
 		this.ChartDirectoryHandle = null;
 		this.BrowserChartID = null;
+		this.DiscardAutosave();
 		context.Chart.Courses.push(new ChartCourse());
 		context.ChartSelectedCourse = context.Chart.Courses[0];
 		context.ChartSelectedBranch = BranchType.Normal;
@@ -247,6 +257,7 @@ export class ChartEditor
 				context.ChartFileHandle = handle;
 				context.ChartFilePath = handle.name;
 				context.Undo.ClearChangesWereMade();
+				this.OnChartSavedExplicitly();
 				this.AddRecentFile(handle.name);
 				this.SetStatus(`Saved '${handle.name}'`);
 				return true;
@@ -264,6 +275,7 @@ export class ChartEditor
 		DownloadTextFile(fileName, tjaText);
 		context.ChartFilePath = fileName;
 		context.Undo.ClearChangesWereMade();
+		this.OnChartSavedExplicitly();
 		this.SetStatus(`Downloaded '${fileName}'`);
 		return true;
 	}
@@ -320,6 +332,7 @@ export class ChartEditor
 			this.BrowserChartID = entry.ID;
 			context.ChartFilePath = fileName;
 			context.Undo.ClearChangesWereMade();
+			this.OnChartSavedExplicitly();
 			this.SetStatus(`Saved '${fileName}' to browser storage` + ((entry.Song === null && entry.SongFileName.length > 0) ? " (without song file)" : ""));
 			return true;
 		}
@@ -355,6 +368,142 @@ export class ChartEditor
 			console.error(e);
 			this.SetStatus(`Failed to open from browser storage: ${String(e)}`);
 			return false;
+		}
+	}
+
+	// NOTE: Web port addition, automatic backup ("autosave") of the current chart into the browser storage
+	private OnChartSavedExplicitly(): void
+	{
+		this.DiscardAutosave();
+	}
+
+	private DiscardAutosave(): void
+	{
+		this.lastAutosaveUndoVersion = this.context.Undo.Version;
+		this.autosavedSongKey = "";
+		void ClearAutosave().catch((e) => console.warn("Failed to clear autosave", e));
+	}
+
+	private NeedsAutosave(): boolean
+	{
+		return this.context.Undo.HasPendingChanges && (this.context.Undo.Version !== this.lastAutosaveUndoVersion) && !this.isAutosaving;
+	}
+
+	/** NOTE: Called every frame, saves once the interval has elapsed and there are unsaved changes that haven't been backed up yet */
+	private UpdateAutosave(): void
+	{
+		const intervalMinutes = Settings.General.AutoSaveIntervalMinutes;
+		const now = performance.now();
+		if (!(intervalMinutes > 0) || !this.NeedsAutosave())
+		{
+			// NOTE: The interval only starts counting once there are new unsaved changes
+			if (!this.NeedsAutosave()) this.lastAutosaveElapsedCheck = now;
+			return;
+		}
+		if ((now - this.lastAutosaveElapsedCheck) >= (intervalMinutes * 60.0 * 1000.0))
+		{
+			this.lastAutosaveElapsedCheck = now;
+			void this.AutosaveNow();
+		}
+	}
+
+	/** NOTE: Saves immediately if needed, also used when the page gets hidden (switching apps on mobile, closing the tab etc.) */
+	async AutosaveNow(force: boolean = false): Promise<boolean>
+	{
+		if (!force && (!(Settings.General.AutoSaveIntervalMinutes > 0) || !this.NeedsAutosave()))
+			return false;
+		if (this.isAutosaving)
+			return false;
+
+		const context = this.context;
+		this.isAutosaving = true;
+		const undoVersion = context.Undo.Version;
+		try
+		{
+			const songFile = await this.FindSongFile(context.Chart.SongFileName);
+			const songKey = (songFile !== null) ? `${songFile.name}|${songFile.size}|${songFile.lastModified}` : `none|${context.Chart.SongFileName}`;
+			const entry: AutosaveEntry = {
+				FileName: this.GetSaveFileName(),
+				Title: context.Chart.ChartTitle[Language.Base],
+				TJAText: this.ConvertChartToTJAText(false),
+				SongFileName: context.Chart.SongFileName,
+				ChartFilePath: context.ChartFilePath,
+				BrowserChartID: this.BrowserChartID,
+				SavedAt: Date.now(),
+			};
+			await PutAutosave(entry, (songKey !== this.autosavedSongKey) ? { SongKey: songKey, Song: songFile } : undefined);
+			// NOTE: The chart might have been saved (or discarded) while the autosave was being written, in which case the backup is stale
+			if (!context.Undo.HasPendingChanges)
+			{
+				this.DiscardAutosave();
+				return false;
+			}
+			this.autosavedSongKey = songKey;
+			this.lastAutosaveUndoVersion = undoVersion;
+			this.LastAutosaveTime = entry.SavedAt;
+			this.SetStatus(`Autosaved to browser storage (${new Date(entry.SavedAt).toLocaleTimeString()})`);
+			return true;
+		}
+		catch (e)
+		{
+			console.warn("Autosave failed", e);
+			this.SetStatus(`Autosave failed: ${String(e)}`);
+			return false;
+		}
+		finally
+		{
+			this.isAutosaving = false;
+		}
+	}
+
+	/** NOTE: Checks for an autosave left behind by a previous session (unsaved changes when the page was closed) */
+	async CheckForAutosaveRecovery(): Promise<void>
+	{
+		try
+		{
+			const autosave = await GetAutosave();
+			if (autosave !== null)
+				this.PendingAutosaveRecovery = { FileName: autosave.Entry.FileName, Title: autosave.Entry.Title, SavedAt: autosave.Entry.SavedAt };
+		}
+		catch (e) { console.warn("Failed to read autosave", e); }
+	}
+
+	async ResolveAutosaveRecovery(restore: boolean): Promise<void>
+	{
+		this.PendingAutosaveRecovery = null;
+		if (!restore)
+		{
+			this.DiscardAutosave();
+			return;
+		}
+
+		try
+		{
+			const autosave = await GetAutosave();
+			if (autosave === null)
+				return;
+			const entry = autosave.Entry;
+			const chartFile = new File([entry.TJAText], entry.FileName, { type: "text/plain" });
+			const siblingFiles = (autosave.Song !== null) ? [new File([autosave.Song], GetFileName(entry.SongFileName) || "song", { type: autosave.Song.type })] : [];
+
+			this.suppressAutosaveClear = true;
+			try { await this.ImportChartFile(chartFile, null, siblingFiles); }
+			finally { this.suppressAutosaveClear = false; }
+
+			const context = this.context;
+			context.ChartFilePath = entry.ChartFilePath;
+			this.BrowserChartID = entry.BrowserChartID;
+			this.createBackupOfOriginalTJABeforeOverwriteSave = false;
+			// NOTE: The recovered chart was never saved properly so it still counts as having unsaved changes (the autosave stays until it is saved)
+			context.Undo.NotifyChangesWereMade();
+			this.lastAutosaveUndoVersion = context.Undo.Version;
+			this.autosavedSongKey = "";
+			this.SetStatus(`Recovered autosave from ${new Date(entry.SavedAt).toLocaleString()}`);
+		}
+		catch (e)
+		{
+			console.error(e);
+			this.SetStatus(`Failed to recover autosave: ${String(e)}`);
 		}
 	}
 
@@ -416,6 +565,8 @@ export class ChartEditor
 			context.SetCursorTime(context.GetCursorTime() + (previousChartSongOffset - context.Chart.SongOffset));
 
 		context.Undo.ClearAll();
+		if (!this.suppressAutosaveClear)
+			this.DiscardAutosave();
 
 		const errorCount = loadResult.TJA.ParseErrors.Errors.length;
 		this.SetStatus(`Loaded '${file.name}'` + ((errorCount > 0) ? ` (${errorCount} parse warnings)` : ""));
@@ -670,6 +821,7 @@ export class ChartEditor
 	{
 		const context = this.context;
 		this.InternalUpdateAsyncLoading();
+		this.UpdateAutosave();
 
 		// NOTE: Animate the gui scale
 		GuiScaleState.Current = Settings.Animation.EnableGuiScaleAnimation ?
