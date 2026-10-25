@@ -113,6 +113,25 @@ describe("TJA", () =>
 		expect(messages).toEqual([]);
 	});
 
+	it("keeps measures of any length (17, 19, 23 characters ...) evenly spaced and unchanged when saving", () =>
+	{
+		for (const line of ["1111111,", "10101010101010101,", "1111111111111111111,", "12121212121212121212121,", "1000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000002,"])
+		{
+			const count = line.length - 1;
+			const text = SampleTJA.replace("1011,", line);
+			const { chart } = Parse(text);
+			const bar = BeatFromBars(1);
+			const notes = chart.Courses[0].Notes_Normal.Sorted.filter((n) => n.BeatTime < bar);
+			const expected = [...line.slice(0, count)].flatMap((c, i) => (c !== "0") ? [Math.round(i * bar / count)] : []);
+			expect(notes.map((n) => n.BeatTime)).toEqual(expected);
+
+			const out = TJA.MakeParsedTJA();
+			ConvertChartProjectToTJA(chart, out);
+			const exported = TJA.ConvertParsedToText(out, TJA.Encoding.Unknown);
+			expect(exported).toContain("\n" + line + "\n");
+		}
+	});
+
 	it("uses the smallest exact measure length when mixing divisions and quantizes off grid positions", () =>
 	{
 		const { chart } = Parse(SampleTJA);

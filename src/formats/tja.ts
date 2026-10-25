@@ -1098,9 +1098,29 @@ export function ConvertConvertedMeasuresToParsedCommands(inMeasures: readonly Co
 						exactNoteCount = n;
 				}
 
+				// NOTE: Measures written with a length that doesn't divide the tick resolution (17, 19, 23 ... characters) can't be represented exactly,
+				//		 so also accept the smallest length that every command lies on within 1 tick (imported positions are rounded to the closest tick) and snap to it
+				let nearlyExactNoteCount = 0;
+				if (exactNoteCount === 0)
+				{
+					const tolerance = 1;
+					for (let n = 1; n <= maxNotesPerMeasure && nearlyExactNoteCount === 0; n++)
+					{
+						const step = measureBarDuration / n;
+						if (tempBuffer.every((c) => Math.abs(c.TimeWithinMeasure - (Math.round(c.TimeWithinMeasure / step) * step)) <= tolerance))
+							nearlyExactNoteCount = n;
+					}
+				}
+
 				if (exactNoteCount > 0)
 				{
 					beatPerNoteInThisMeasure = measureBarDuration / exactNoteCount;
+				}
+				else if (nearlyExactNoteCount > 0)
+				{
+					beatPerNoteInThisMeasure = measureBarDuration / nearlyExactNoteCount;
+					for (const c of tempBuffer)
+						c.TimeWithinMeasure = Math.min(Math.round(c.TimeWithinMeasure / beatPerNoteInThisMeasure), nearlyExactNoteCount) * beatPerNoteInThisMeasure;
 				}
 				else
 				{
@@ -1110,7 +1130,8 @@ export function ConvertConvertedMeasuresToParsedCommands(inMeasures: readonly Co
 				}
 			}
 
-			const noteCommandsInThisMeasure = (beatPerNoteInThisMeasure === 0) ? 0 : IDiv(measureBarDuration, beatPerNoteInThisMeasure);
+			// NOTE: Rounded because the (nearly exact) step size above doesn't have to be an integer
+			const noteCommandsInThisMeasure = (beatPerNoteInThisMeasure === 0) ? 0 : Math.round(measureBarDuration / beatPerNoteInThisMeasure);
 
 			// NOTE: Insert empty notes based on smallestBarDivision
 			if (noteCommandsInThisMeasure > 0)
@@ -1187,12 +1208,11 @@ export function ConvertParsedToConvertedCourse(inContent: ParsedTJA, inCourse: P
 			measure.StartTime = currentMeasureTime;
 			currentMeasureTime += GetDurationPerBar(measure.TimeSignature);
 
-			let currentTimeWithinMeasure = 0;
-			for (const note of measure.Notes)
-			{
-				note.TimeWithinMeasure = currentTimeWithinMeasure;
-				currentTimeWithinMeasure += IDiv(GetDurationPerBar(measure.TimeSignature), measure.Notes.length);
-			}
+			// NOTE: Web port change ("more-grid"), the original accumulates a truncated step which drifts for measure lengths that don't divide the tick resolution.
+			//		 Each position is calculated directly (and rounded) instead, so for example a 17 character measure stays evenly spaced
+			const measureDuration = GetDurationPerBar(measure.TimeSignature);
+			const noteCount = measure.Notes.length;
+			measure.Notes.forEach((note, noteIndex) => { note.TimeWithinMeasure = Math.round((noteIndex * measureDuration) / noteCount); });
 		}
 	}
 
