@@ -1,8 +1,10 @@
 // Port of PeepoDrumKit "peepo_drum_kit/chart_editor_sound.h" / "chart_editor_sound.cpp"
 // https://github.com/samyuu/PeepoDrumKit
 //
-// NOTE: The original loads "assets/audio/*.wav" files which are not part of the public repository,
-//		 so the sound effects are synthesized procedurally instead (and can optionally be replaced by user provided files).
+// NOTE: The original loads "assets/audio/*.wav" files which are not part of the public repository.
+//		 The don / ka hit sounds are loaded from "public/assets/audio/{don,ka}.wav" instead (taken from https://github.com/hotsixman/tja-tools,
+//		 previewer/src/assets, level matched to the same perceived loudness), the metronome is synthesized procedurally.
+//		 Until the files are decoded (or should loading fail) synthesized fallback sounds are used. Everything can optionally be replaced by user provided files
 import { CPUStopwatch, type Time, TimeFromFrames } from "../core/types";
 import { Engine } from "../audio/engine";
 
@@ -92,15 +94,49 @@ export class SoundEffectsVoicePool
 	LoadedSources: (AudioBuffer | null)[] = new Array(SoundEffectType.Count).fill(null);
 	private customSources: (AudioBuffer | null)[] = new Array(SoundEffectType.Count).fill(null);
 
-	StartAsyncLoadingAndAddVoices(): void { /* NOTE: Sources are created lazily once the audio context exists */ }
+	// NOTE: Encoded hit sound files, fetched right away and decoded once the audio context exists (which requires a user gesture)
+	private static readonly SoundEffectFilePaths: Partial<Record<SoundEffectType, string>> = {
+		[SoundEffectType.TaikoDon]: `${import.meta.env.BASE_URL}assets/audio/don.wav`,
+		[SoundEffectType.TaikoKa]: `${import.meta.env.BASE_URL}assets/audio/ka.wav`,
+	};
+	private fileBytes: (Promise<ArrayBuffer | null> | null)[] = new Array(SoundEffectType.Count).fill(null);
+	private startedDecoding = false;
+
+	StartAsyncLoadingAndAddVoices(): void
+	{
+		for (const [type, path] of Object.entries(SoundEffectsVoicePool.SoundEffectFilePaths))
+		{
+			this.fileBytes[Number(type)] = fetch(path)
+				.then((response) => response.ok ? response.arrayBuffer() : null)
+				.catch((e) => { console.warn(`Failed to load sound effect '${path}'`, e); return null; });
+		}
+	}
 
 	UpdateAsyncLoading(): void
 	{
 		const ctx = Engine.Context;
-		if (ctx === null || this.LoadedSources[0] !== null)
+		if (ctx === null)
 			return;
-		for (let i = 0; i < SoundEffectType.Count; i++)
-			this.LoadedSources[i] = SynthesizeSoundEffect(ctx, i);
+
+		// NOTE: Synthesized sources are available immediately and act as a fallback until (or if) the files are decoded
+		if (this.LoadedSources[0] === null)
+			for (let i = 0; i < SoundEffectType.Count; i++)
+				this.LoadedSources[i] = SynthesizeSoundEffect(ctx, i);
+
+		if (!this.startedDecoding)
+		{
+			this.startedDecoding = true;
+			this.fileBytes.forEach((bytesPromise, type) =>
+			{
+				if (bytesPromise === null) return;
+				void bytesPromise.then(async (bytes) =>
+				{
+					if (bytes === null) return;
+					try { this.LoadedSources[type] = await ctx.decodeAudioData(bytes.slice(0)); }
+					catch (e) { console.warn(`Failed to decode sound effect ${SoundEffectType[type]}`, e); }
+				});
+			});
+		}
 	}
 
 	SetCustomSource(type: SoundEffectType, buffer: AudioBuffer | null): void { this.customSources[type] = buffer; }

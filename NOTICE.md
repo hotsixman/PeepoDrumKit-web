@@ -23,3 +23,7 @@ The following parts are ported from, or based on, the original source code:
 | `public/assets/graphics/*.svg` | `assets/graphics/*.svg` (copied unchanged) |
 
 The user interface (Svelte components, mobile layout, touch gestures) is newly written and only uses the original UI as a reference.
+
+## Other assets
+
+- `public/assets/audio/don.wav`, `public/assets/audio/ka.wav`: hit sounds from [hotsixman/tja-tools](https://github.com/hotsixman/tja-tools) (`previewer/src/assets`), converted to WAV and level matched to the same perceived loudness.
