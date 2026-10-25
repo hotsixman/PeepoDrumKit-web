@@ -5,8 +5,8 @@
 	import { Settings } from "../../editor/settings";
 	import { TimeSpace, ConvertTimeSpace, ScrollSpeedToTempo, ScrollTempoToSpeed, IsNotesList, GenericList, ForEachSelectedChartItem, MakeScrollChange, MakeBarLineChange, MakeGoGoRange, NewSortedGoGoRangesList, CloneGoGoRange, GoGoGetStart, GoGoGetEnd, type GoGoRange } from "../../editor/chart";
 	import { type Time, Clamp, ClampBot, TimeToString, TimeToMS, TimeFromMS, FormatG, F32Max } from "../../core/types";
-	import { FloorBeatToGrid, GetGridBeatSnap, FallbackTempo, FallbackTimeSignature, TempoChange, TimeSignatureChange, Tempo, TimeSignature, IsTimeSignatureSupported, TicksPerBeat } from "../../core/beat";
-	import { TimelineDragScalarSpeedAtZoomSec, TimelineDragScalarSpeedAtZoomMS, ValidGridBarDivisions, ClosestValidGridBarDivision } from "../../editor/timeline";
+	import { FloorBeatToGrid, GetGridBeatSnap, FallbackTempo, FallbackTimeSignature, TempoChange, TimeSignatureChange, Tempo, TimeSignature, IsTimeSignatureSupported, OriginalTicksPerBeat } from "../../core/beat";
+	import { TimelineDragScalarSpeedAtZoomSec, TimelineDragScalarSpeedAtZoomMS, ValidGridBarDivisions, QuickGridBarDivisions, ClosestValidGridBarDivision } from "../../editor/timeline";
 	import * as Commands from "../../editor/undo-commands";
 	import Section from "../widgets/Section.svelte";
 	import PropertyTable from "../widgets/PropertyTable.svelte";
@@ -14,7 +14,7 @@
 
 	const MinBPM = 30.0, MaxBPM = 960.0;
 	const MinScrollSpeed = -100.0, MaxScrollSpeed = +100.0;
-	const MinTimeSignatureValue = 1, MaxTimeSignatureValue = TicksPerBeat * 4;
+	const MinTimeSignatureValue = 1, MaxTimeSignatureValue = OriginalTicksPerBeat * 4;
 
 	const context = editor.context;
 	const timeline = editor.timeline;
@@ -166,7 +166,7 @@
 		</PropertyTable>
 	</Section>
 
-	<!-- NOTE: Web port addition, freely set the grid division (snapped to the closest value that lands exactly on the internal 192 ticks per bar resolution) -->
+	<!-- NOTE: Web port addition, freely set the grid division (snapped to the closest value that lands exactly on the internal tick resolution) -->
 	<Section title={UI_Str("Grid")}>
 		<PropertyTable>
 			<div class="prop-label">{UI_Str("Grid Division")}</div>
@@ -177,7 +177,7 @@
 			<div class="prop-label"></div>
 			<div class="prop-value">
 				<div class="grid-presets">
-					{#each ValidGridBarDivisions as division}
+					{#each QuickGridBarDivisions as division}
 						<button class:on={division === data.gridBarDivision} onclick={() => setGridBarDivision(division)}>{division}</button>
 					{/each}
 				</div>

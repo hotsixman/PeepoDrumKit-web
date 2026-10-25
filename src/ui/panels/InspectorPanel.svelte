@@ -10,14 +10,14 @@
 		MakeAllGenericMembersArray, GenericMemberValuesEqual, CloneGenericMemberValue, TempoOrDefault, ScrollSpeedToTempo, ScrollTempoToSpeed,
 		IsBalloonNote, IsRegularNote, IsDrumrollNote, IsLongNote, IsSmallNote, IsBigNote, ToBigNote, ToSmallNote, TimeSpace, ConvertTimeSpace,
 	} from "../../editor/chart";
-	import { BeatSortedForwardIterator, type TempoChange, IsTimeSignatureSupported, Tempo as MakeTempo, TicksPerBeat } from "../../core/beat";
+	import { BeatSortedForwardIterator, type TempoChange, IsTimeSignatureSupported, Tempo as MakeTempo, OriginalTicksPerBeat } from "../../core/beat";
 	import { Clamp, TimeToString, TimeToMS, TimeFromMS, FormatG, ApproxmiatelySame, ConvertRange, type Time } from "../../core/types";
 	import * as Commands from "../../editor/undo-commands";
 	import Section from "../widgets/Section.svelte";
 	import PropertyTable from "../widgets/PropertyTable.svelte";
 	import DragNumber from "../widgets/DragNumber.svelte";
 
-	const MinTimeSignatureValue = 1, MaxTimeSignatureValue = TicksPerBeat * 4;
+	const MinTimeSignatureValue = 1, MaxTimeSignatureValue = OriginalTicksPerBeat * 4;
 	const MinBalloonCount = 0, MaxBalloonCount = 999;
 	const MinBPM = 30.0, MaxBPM = 960.0;
 	const MinScrollSpeed = -100.0, MaxScrollSpeed = +100.0;

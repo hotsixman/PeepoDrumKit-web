@@ -4,7 +4,7 @@
 // NOTE: The Dear ImGui menu bar / window drawing parts have been replaced by Svelte components (see "src/ui"),
 //		 this class contains the (non-ui) editor logic of the original ChartEditor
 import { type Time, CPUStopwatch, Clamp } from "../core/types";
-import { TempoChange, TimeSignatureChange, Tempo, TimeSignature } from "../core/beat";
+import { TempoChange, TimeSignatureChange, Tempo, TimeSignature, TicksPerBeat } from "../core/beat";
 import * as TJA from "../formats/tja";
 import { ChartProject, ChartCourse, BranchType, Language, CreateChartProjectFromTJA, ConvertChartProjectToTJA, ForEachSelectedChartItem, IsNotesList } from "./chart";
 import { ChartContext } from "./context";
@@ -751,7 +751,7 @@ export class ChartEditor
 		let selectionHash = 0, selectionCount = 0;
 		ForEachSelectedChartItem(course, (it) => { selectionCount++; selectionHash = (selectionHash * 31 + it.List * 7919 + it.Index) | 0; });
 		// NOTE: Only coarsely track the cursor during playback to avoid re-rendering the panels too often
-		const cursorBeat = context.GetIsPlayback() ? Math.floor(context.GetCursorBeat() / 48) : this.timeline.FloorBeatToCurrentGrid(context.GetCursorBeat());
+		const cursorBeat = context.GetIsPlayback() ? Math.floor(context.GetCursorBeat() / TicksPerBeat) : this.timeline.FloorBeatToCurrentGrid(context.GetCursorBeat());
 		const r = this.timeline.RangeSelection;
 		return [
 			context.Undo.Version, context.Undo.HasPendingChanges ? 1 : 0, selectionCount, selectionHash, course.ID, context.Chart.Courses.length, context.ChartSelectedBranch,

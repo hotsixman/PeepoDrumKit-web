@@ -6,7 +6,12 @@ import { ControlFlow, ClampBot, Round, IDiv, type Time } from "./types";
 export type Beat = number;
 
 // NOTE: Meaning a 4/4 bar can be meaningfully subdivided into 192 parts, as is a common convention for rhythm games
-export const TicksPerBeat = (192 / 4);
+export const OriginalTicksPerBeat = (192 / 4);
+// NOTE: Web port change ("more-grid"), the original resolution multiplied by 3*5*7*11*13 so that a bar can also be exactly divided into
+//		 5, 7, 9, 10, 11, 13, 14, 20, 28 ... parts while every original 1/192 position stays exact (2,882,880 ticks per 4/4 bar).
+//		 Beats are plain JS numbers (doubles) so this stays exact far beyond any realistic song length
+export const TicksPerBeatResolutionMultiplier = (3 * 5 * 7 * 11 * 13);
+export const TicksPerBeat = (OriginalTicksPerBeat * TicksPerBeatResolutionMultiplier);
 
 export const BeatZero = 0;
 export const BeatFromTicks = (ticks: number): Beat => ticks;
@@ -194,17 +199,46 @@ export function LinearlySearchForInsertionIndex<T extends BeatItem>(sortedList: 
 
 export class TempoMapAccelerationStructure
 {
-	// NOTE: Pre calculated beat times up to the last tempo change
-	BeatTickToTimes: Float64Array = new Float64Array(0);
+	// NOTE: Web port change, the original pre calculates the time of every single beat tick up to the last tempo change.
+	//		 With the much higher tick resolution of the web port (see TicksPerBeat) that table would become huge,
+	//		 so instead only the start of each constant tempo segment is stored and everything in between is calculated.
+	//		 The results are equivalent to the original lookup table (including its rounding and out of range behavior)
+	private SegmentBeats: Float64Array = new Float64Array(0);
+	private SegmentTimes: Float64Array = new Float64Array(0);
+	private SegmentTickDurations: Float64Array = new Float64Array(0);
 	FirstTempoBPM = 0.0;
 	LastTempoBPM = 0.0;
 
+	private FindSegmentIndexForBeat(beat: Beat): number
+	{
+		const beats = this.SegmentBeats;
+		let lo = 0, hi = beats.length - 1;
+		while (lo < hi)
+		{
+			const mid = (lo + hi + 1) >>> 1;
+			if (beats[mid] <= beat) lo = mid; else hi = mid - 1;
+		}
+		return lo;
+	}
+
+	private FindSegmentIndexForTime(time: Time): number
+	{
+		const times = this.SegmentTimes;
+		let lo = 0, hi = times.length - 1;
+		while (lo < hi)
+		{
+			const mid = (lo + hi + 1) >>> 1;
+			if (times[mid] <= time) lo = mid; else hi = mid - 1;
+		}
+		return lo;
+	}
+
 	ConvertBeatToTimeUsingLookupTableIndexing(beat: Beat): Time
 	{
-		const beatTickToTimesCount = this.BeatTickToTimes.length;
+		const segmentCount = this.SegmentBeats.length;
 		const totalBeatTicks = beat;
 
-		if (totalBeatTicks < 0) // NOTE: Negative tick (tempo changes are assumed to only be positive)
+		if (totalBeatTicks < 0 || segmentCount === 0) // NOTE: Negative tick (tempo changes are assumed to only be positive)
 		{
 			// NOTE: Calculate the duration of a Beat at the first tempo
 			const firstTickDuration = ((60.0 / this.FirstTempoBPM) / TicksPerBeat);
@@ -212,30 +246,18 @@ export class TempoMapAccelerationStructure
 			// NOTE: Then scale by the negative tick
 			return firstTickDuration * totalBeatTicks;
 		}
-		else if (totalBeatTicks >= beatTickToTimesCount) // NOTE: Tick is outside the defined tempo map
-		{
-			// NOTE: Take the last calculated time
-			const lastTime = this.GetLastCalculatedTime();
 
-			// NOTE: Calculate the duration of a Beat at the last used tempo
-			const lastTickDuration = ((60.0 / this.LastTempoBPM) / TicksPerBeat);
-
-			// NOTE: Then scale by the remaining ticks
-			const remainingTicks = (totalBeatTicks - beatTickToTimesCount) + 1;
-			return lastTime + (lastTickDuration * remainingTicks);
-		}
-		else // NOTE: Use the pre calculated lookup table directly
-		{
-			return this.BeatTickToTimes[totalBeatTicks];
-		}
+		// NOTE: Ticks past the last tempo change simply continue at the last tempo (same as the original)
+		const i = this.FindSegmentIndexForBeat(totalBeatTicks);
+		return this.SegmentTimes[i] + (this.SegmentTickDurations[i] * (totalBeatTicks - this.SegmentBeats[i]));
 	}
 
 	ConvertTimeToBeatUsingLookupTableBinarySearch(time: Time): Beat
 	{
-		const beatTickToTimesCount = this.BeatTickToTimes.length;
+		const segmentCount = this.SegmentBeats.length;
 		const lastTime = this.GetLastCalculatedTime();
 
-		if (time < 0.0) // NOTE: Negative time
+		if (time < 0.0 || segmentCount === 0) // NOTE: Negative time
 		{
 			// NOTE: Calculate the duration of a Beat at the first tempo
 			const firstTickDuration = ((60.0 / this.FirstTempoBPM) / TicksPerBeat);
@@ -254,32 +276,21 @@ export class TempoMapAccelerationStructure
 			const ticks = (timePastLast / lastTickDuration);
 
 			// NOTE: And add it to the last tick
-			return Math.trunc(beatTickToTimesCount + ticks - 1);
+			return Math.trunc(this.SegmentBeats[segmentCount - 1] + ticks);
 		}
-		else // NOTE: Perform a binary search
+		else // NOTE: Closest tick inside the segment, ties resolve to the earlier tick (same as the original binary search)
 		{
-			const times = this.BeatTickToTimes;
-			let left = 0, right = beatTickToTimesCount - 1;
-
-			while (left <= right)
-			{
-				const mid = (left + right) >> 1;
-
-				if (time < times[mid])
-					right = mid - 1;
-				else if (time > times[mid])
-					left = mid + 1;
-				else
-					return mid;
-			}
-
-			return ((times[left] - time) < (time - times[right])) ? left : right;
+			const i = this.FindSegmentIndexForTime(time);
+			const segmentTickCount = (i + 1 < segmentCount) ? (this.SegmentBeats[i + 1] - this.SegmentBeats[i]) : 0;
+			const ticksIntoSegment = (time - this.SegmentTimes[i]) / this.SegmentTickDurations[i];
+			const closestTick = Math.min(Math.max(Math.ceil(ticksIntoSegment - 0.5), 0), segmentTickCount);
+			return this.SegmentBeats[i] + closestTick;
 		}
 	}
 
 	GetLastCalculatedTime(): Time
 	{
-		return (this.BeatTickToTimes.length === 0) ? 0.0 : this.BeatTickToTimes[this.BeatTickToTimes.length - 1];
+		return (this.SegmentTimes.length === 0) ? 0.0 : this.SegmentTimes[this.SegmentTimes.length - 1];
 	}
 
 	Rebuild(inTempoChanges: readonly TempoChange[]): void
@@ -291,12 +302,14 @@ export class TempoMapAccelerationStructure
 			tempoChanges = [TempoChange(0, FallbackTempo), ...inTempoChanges];
 
 		const tempoCount = tempoChanges.length;
-		const timesLength = (tempoCount > 0) ? tempoChanges[tempoCount - 1].BeatTime + 1 : 0;
-		if (this.BeatTickToTimes.length !== timesLength)
-			this.BeatTickToTimes = new Float64Array(timesLength);
-		const times = this.BeatTickToTimes;
+		if (this.SegmentBeats.length !== tempoCount)
+		{
+			this.SegmentBeats = new Float64Array(tempoCount);
+			this.SegmentTimes = new Float64Array(tempoCount);
+			this.SegmentTickDurations = new Float64Array(tempoCount);
+		}
 
-		let lastEndTime = 0.0;
+		let segmentStartTime = 0.0;
 		for (let tempoChangeIndex = 0; tempoChangeIndex < tempoCount; tempoChangeIndex++)
 		{
 			const tempoChange = tempoChanges[tempoChangeIndex];
@@ -305,14 +318,15 @@ export class TempoMapAccelerationStructure
 			const beatDuration = (60.0 / bpm);
 			const tickDuration = (beatDuration / TicksPerBeat);
 
-			const isSingleOrLastTempo = (tempoCount === 1) || (tempoChangeIndex === (tempoCount - 1));
-			const timesCount = isSingleOrLastTempo ? times.length : (tempoChanges[tempoChangeIndex + 1].BeatTime);
+			if (tempoChangeIndex > 0)
+			{
+				const prev = tempoChangeIndex - 1;
+				segmentStartTime = this.SegmentTimes[prev] + (this.SegmentTickDurations[prev] * (tempoChange.BeatTime - this.SegmentBeats[prev]));
+			}
 
-			for (let i = 0, t = tempoChange.BeatTime; t < timesCount; t++)
-				times[t] = (tickDuration * i++) + lastEndTime;
-
-			if (tempoCount > 1)
-				lastEndTime = times[timesCount - 1] + tickDuration;
+			this.SegmentBeats[tempoChangeIndex] = tempoChange.BeatTime;
+			this.SegmentTimes[tempoChangeIndex] = segmentStartTime;
+			this.SegmentTickDurations[tempoChangeIndex] = tickDuration;
 
 			this.FirstTempoBPM = (tempoChangeIndex === 0) ? bpm : this.FirstTempoBPM;
 			this.LastTempoBPM = bpm;

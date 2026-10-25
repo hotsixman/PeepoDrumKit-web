@@ -1080,7 +1080,36 @@ export function ConvertConvertedMeasuresToParsedCommands(inMeasures: readonly Co
 					smallestBarDivision = Math.min(smallestBarDivision, itDivision);
 			}
 
-			const beatPerNoteInThisMeasure = IDiv(BeatFromBars(1), smallestBarDivision);
+			let beatPerNoteInThisMeasure = IDiv(BeatFromBars(1), smallestBarDivision);
+
+			// NOTE: Web port addition ("more-grid"), with the higher tick resolution commands don't necessarily fit any of the supported bar divisions anymore
+			//		 (1/5, 1/7 etc.), in that case use the smallest number of characters per measure that represents every command exactly.
+			//		 Should nothing reasonably small fit (positions that don't lie on any musical grid) fall back to quantizing to 1/192 like the original resolution
+			if (!tempBuffer.every((c) => (c.TimeWithinMeasure % beatPerNoteInThisMeasure) === 0))
+			{
+				const maxNotesPerMeasure = Math.max(1, Math.round((measureBarDuration / BeatFromBars(1)) * 192 * 8));
+				let exactNoteCount = 0;
+				for (let n = 1; n <= maxNotesPerMeasure && exactNoteCount === 0; n++)
+				{
+					if ((measureBarDuration % n) !== 0)
+						continue;
+					const step = measureBarDuration / n;
+					if (tempBuffer.every((c) => (c.TimeWithinMeasure % step) === 0))
+						exactNoteCount = n;
+				}
+
+				if (exactNoteCount > 0)
+				{
+					beatPerNoteInThisMeasure = measureBarDuration / exactNoteCount;
+				}
+				else
+				{
+					beatPerNoteInThisMeasure = IDiv(BeatFromBars(1), 192);
+					for (const c of tempBuffer)
+						c.TimeWithinMeasure = Math.min(Math.round(c.TimeWithinMeasure / beatPerNoteInThisMeasure) * beatPerNoteInThisMeasure, measureBarDuration);
+				}
+			}
+
 			const noteCommandsInThisMeasure = (beatPerNoteInThisMeasure === 0) ? 0 : IDiv(measureBarDuration, beatPerNoteInThisMeasure);
 
 			// NOTE: Insert empty notes based on smallestBarDivision

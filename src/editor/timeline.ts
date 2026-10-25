@@ -11,7 +11,7 @@ import
 import
 {
 	type Beat, type TempoChange, type TimeSignatureChange, BeatSortedList, GetGridBeatSnap, FloorBeatToGrid, RoundBeatToGrid, CeilBeatToGrid,
-	IsTupletBarDivision, BeatFromBars, BeatFromBeats, BeatDiv, IsTimeSignatureSupported, type ForEachBeatBarData,
+	IsTupletBarDivision, BeatFromBars, BeatFromBeats, BeatDiv, IsTimeSignatureSupported, type ForEachBeatBarData, TicksPerBeat, OriginalTicksPerBeat,
 } from "../core/beat";
 import
 {
@@ -155,9 +155,12 @@ export class TimelineRegions
 }
 
 export const AllowedGridBarDivisions: readonly number[] = [4, 8, 12, 16, 24, 32, 48, 64, 96, 192];
-// NOTE: Web port addition, every grid division that lands exactly on the internal beat tick resolution (1, 2, 3, 4, 6, 8, 12 ... 192 per bar).
-//		 Used for freely setting the grid instead of only the presets above
-export const ValidGridBarDivisions: readonly number[] = Array.from({ length: BeatFromBars(1) }, (_, i) => i + 1).filter((it) => (BeatFromBars(1) % it) === 0);
+// NOTE: Web port addition, every grid division (up to 1/192) that lands exactly on the internal beat tick resolution
+//		 (1 to 16, 18, 20, 21, 22, 24, 26, 28 ... 192 per bar). Used for freely setting the grid instead of only the presets above
+export const MaxGridBarDivision = 192;
+export const ValidGridBarDivisions: readonly number[] = Array.from({ length: MaxGridBarDivision }, (_, i) => i + 1).filter((it) => (BeatFromBars(1) % it) === 0);
+// NOTE: Subset shown as quick select buttons
+export const QuickGridBarDivisions: readonly number[] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 12, 14, 16, 20, 24, 28, 32, 48, 64, 96, 192];
 export function ClosestValidGridBarDivision(barDivision: number): number
 {
 	let closest = ValidGridBarDivisions[0];
@@ -1174,9 +1177,11 @@ export class ChartTimeline
 	async ExecuteClipboardAction(context: ChartContext, action: ClipboardAction): Promise<void>
 	{
 		const clipboardTextHeader = "// PeepoDrumKit Clipboard";
+		// NOTE: Web port addition ("more-grid"), the tick resolution is stored so that items copied from the original resolution (48 ticks per beat) are scaled correctly
+		const clipboardTicksPerBeatPrefix = "// TicksPerBeat: ";
 		const itemsToClipboardText = (inItems: GenericListStructWithType[], baseBeat: Beat): string =>
 		{
-			let out = clipboardTextHeader + "\n";
+			let out = clipboardTextHeader + "\n" + clipboardTicksPerBeatPrefix + TicksPerBeat + "\n";
 			for (const item of inItems)
 			{
 				switch (item.List)
@@ -1203,10 +1208,19 @@ export class ChartTimeline
 			if (!clipboardText.startsWith(clipboardTextHeader))
 				return out;
 
+			// NOTE: Clipboard text without a resolution line comes from the original (or a previous web port version) using 48 ticks per beat
+			let sourceTicksPerBeat = OriginalTicksPerBeat;
+
 			// TODO: Split and parse by ';' instead of '\n' (?)
 			for (let line of clipboardText.split("\n"))
 			{
 				line = line.replace(/\r$/, "");
+				if (line.startsWith(clipboardTicksPerBeatPrefix))
+				{
+					const v = parseInt(line.substring(clipboardTicksPerBeatPrefix.length), 10);
+					if (Number.isFinite(v) && v > 0) sourceTicksPerBeat = v;
+					continue;
+				}
 				if (line.length === 0 || line.startsWith("//"))
 					continue;
 
@@ -1241,6 +1255,17 @@ export class ChartTimeline
 					else if (itemType === "ScrollSpeed") out.push({ List: GenericList.ScrollChanges, Value: MakeScrollChange(i32(0), f32(1)) });
 					else if (itemType === "BarLine") out.push({ List: GenericList.BarLineChanges, Value: { BeatTime: i32(0), IsVisible: i32(1) !== 0, IsSelected: false } as BarLineChange });
 					else if (itemType === "GoGo") out.push({ List: GenericList.GoGoRanges, Value: { BeatTime: i32(0), BeatDuration: i32(1), IsSelected: false, ExpansionAnimationCurrent: 0.0, ExpansionAnimationTarget: 1.0 } as GoGoRange });
+				}
+			}
+
+			if (sourceTicksPerBeat !== TicksPerBeat)
+			{
+				const scaleBeat = (beat: Beat): Beat => Math.round(beat * TicksPerBeat / sourceTicksPerBeat);
+				for (const it of out)
+				{
+					const v = it.Value as { BeatTime: Beat; BeatDuration?: Beat };
+					v.BeatTime = scaleBeat(v.BeatTime);
+					if (v.BeatDuration !== undefined) v.BeatDuration = scaleBeat(v.BeatDuration);
 				}
 			}
 			return out;
