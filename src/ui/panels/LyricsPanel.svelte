@@ -4,7 +4,6 @@
 	import { UI_Str } from "../../editor/i18n";
 	import { Settings } from "../../editor/settings";
 	import { TimeSpace, ConvertTimeSpace, MakeLyricChange } from "../../editor/chart";
-	import { FloorBeatToGrid, GetGridBeatSnap } from "../../core/beat";
 	import { TimeToString } from "../../core/types";
 	import * as Commands from "../../editor/undo-commands";
 	import Section from "../widgets/Section.svelte";
@@ -47,7 +46,7 @@
 		for (const lyricChange of course.Lyrics.Sorted)
 			allLyrics += `${TimeToString(ConvertTimeSpace(course.TempoMap.BeatToTime(lyricChange.BeatTime), TimeSpace.Chart, timeSpace, context.Chart.SongOffset))} > ${ConvertToEscapeSequences(lyricChange.Lyric)}\n`;
 
-		const cursorBeat = FloorBeatToGrid(context.GetCursorBeat(), GetGridBeatSnap(timeline.CurrentGridBarDivision));
+		const cursorBeat = timeline.FloorBeatToCurrentGrid(context.GetCursorBeat());
 		const lyricChangeAtCursor = course.Lyrics.TryFindLastAtBeat(cursorBeat);
 		return { allLyrics, cursorBeat, lyricAtCursor: (lyricChangeAtCursor !== null) ? ResolveEscapeSequences(lyricChangeAtCursor.Lyric) : "", isExactlyAtCursor: lyricChangeAtCursor !== null && lyricChangeAtCursor.BeatTime === cursorBeat };
 	});

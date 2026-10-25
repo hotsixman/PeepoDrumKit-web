@@ -10,8 +10,9 @@ import
 } from "../core/types";
 import
 {
-	type Beat, type TempoChange, type TimeSignatureChange, BeatSortedList, GetGridBeatSnap, FloorBeatToGrid, RoundBeatToGrid, CeilBeatToGrid,
+	type Beat, type TempoChange, type TimeSignatureChange, BeatSortedList, GetGridBeatSnap,
 	IsTupletBarDivision, BeatFromBars, BeatFromBeats, BeatDiv, IsTimeSignatureSupported, type ForEachBeatBarData, TicksPerBeat, OriginalTicksPerBeat,
+	GridIndexToBeat, FloorBeatToGridIndex, CeilBeatToGridIndex, RoundBeatToGridIndex, FloorBeatToGridDivision, RoundBeatToGridDivision, CeilBeatToGridDivision, StepBeatByGridDivision,
 } from "../core/beat";
 import
 {
@@ -155,19 +156,11 @@ export class TimelineRegions
 }
 
 export const AllowedGridBarDivisions: readonly number[] = [4, 8, 12, 16, 24, 32, 48, 64, 96, 192];
-// NOTE: Web port addition, every grid division (up to 1/192) that lands exactly on the internal beat tick resolution
-//		 (1 to 16, 18, 20, 21, 22, 24, 26, 28 ... 192 per bar). Used for freely setting the grid instead of only the presets above
-export const MaxGridBarDivision = 192;
-export const ValidGridBarDivisions: readonly number[] = Array.from({ length: MaxGridBarDivision }, (_, i) => i + 1).filter((it) => (BeatFromBars(1) % it) === 0);
+// NOTE: Web port addition ("more-grid"), the grid can be set to any whole bar division (see GridIndexToBeat() for how inexact divisions are handled)
+export const MinGridBarDivision = 1, MaxGridBarDivision = 1000;
 // NOTE: Subset shown as quick select buttons
-export const QuickGridBarDivisions: readonly number[] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 12, 14, 16, 20, 24, 28, 32, 48, 64, 96, 192];
-export function ClosestValidGridBarDivision(barDivision: number): number
-{
-	let closest = ValidGridBarDivisions[0];
-	for (const it of ValidGridBarDivisions)
-		if (Math.abs(Math.log(it / barDivision)) < Math.abs(Math.log(closest / barDivision))) closest = it;
-	return closest;
-}
+export const QuickGridBarDivisions: readonly number[] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 16, 20, 24, 32, 48, 96, 192];
+export const ClampGridBarDivision = (barDivision: number): number => Clamp(Math.round(barDivision), MinGridBarDivision, MaxGridBarDivision);
 
 // NOTE: Nudge the startup camera position and min scrollbar.x slightly to the left
 //		 so that a line drawn at worldspace position { x = 0.0f } is fully visible
@@ -351,9 +344,10 @@ export class ChartTimeline
 
 	HasKeyboardFocus(): boolean { return this.IsAnyChildWindowFocused; }
 
-	FloorBeatToCurrentGrid(beat: Beat): Beat { return FloorBeatToGrid(beat, GetGridBeatSnap(this.CurrentGridBarDivision)); }
-	RoundBeatToCurrentGrid(beat: Beat): Beat { return RoundBeatToGrid(beat, GetGridBeatSnap(this.CurrentGridBarDivision)); }
-	CeilBeatToCurrentGrid(beat: Beat): Beat { return CeilBeatToGrid(beat, GetGridBeatSnap(this.CurrentGridBarDivision)); }
+	// NOTE: Web port change ("more-grid"), works for any grid division (see FloorBeatToGridDivision()), identical to the original for exact divisions
+	FloorBeatToCurrentGrid(beat: Beat): Beat { return FloorBeatToGridDivision(beat, this.CurrentGridBarDivision); }
+	RoundBeatToCurrentGrid(beat: Beat): Beat { return RoundBeatToGridDivision(beat, this.CurrentGridBarDivision); }
+	CeilBeatToCurrentGrid(beat: Beat): Beat { return CeilBeatToGridDivision(beat, this.CurrentGridBarDivision); }
 
 	ScreenToLocalSpace(s: vec2): vec2 { return V2(s.x - this.Regions.Content.TL.x, s.y - this.Regions.Content.TL.y); }
 	LocalToScreenSpace(l: vec2): vec2 { return V2(l.x + this.Regions.Content.TL.x, l.y + this.Regions.Content.TL.y); }
@@ -1570,9 +1564,19 @@ export class ChartTimeline
 
 	StepCursorByBeat(context: ChartContext, beatIncrement: Beat): void
 	{
+		const oldCursorBeat = this.RoundBeatToCurrentGrid(context.GetCursorBeatAndTime().Beat);
+		this.StepCursorToBeat(context, oldCursorBeat + beatIncrement);
+	}
+
+	/** NOTE: Web port addition ("more-grid"), steps by a number of grid lines instead of a fixed beat distance so that it also works for inexact grid divisions */
+	StepCursorByGrid(context: ChartContext, gridSteps: number): void
+	{
+		this.StepCursorToBeat(context, StepBeatByGridDivision(context.GetCursorBeatAndTime().Beat, gridSteps, this.CurrentGridBarDivision));
+	}
+
+	private StepCursorToBeat(context: ChartContext, newCursorBeat: Beat): void
+	{
 		const oldCursorBeatAndTime = context.GetCursorBeatAndTime();
-		const oldCursorBeat = this.RoundBeatToCurrentGrid(oldCursorBeatAndTime.Beat);
-		const newCursorBeat = oldCursorBeat + beatIncrement;
 
 		context.SetCursorBeat(newCursorBeat);
 		this.PlayNoteSoundAndHitAnimationsAtBeat(context, newCursorBeat);
@@ -1614,15 +1618,15 @@ export class ChartTimeline
 
 		if (fillRangeSelection && this.RangeSelectionIsActiveAndHasEnd())
 		{
-			const startTick = this.RoundBeatToCurrentGrid(this.RangeSelectionGetMin());
-			const endTick = this.RoundBeatToCurrentGrid(this.RangeSelectionGetMax());
-			const beatPerNote = GetGridBeatSnap(this.CurrentGridBarDivision);
-			const maxExpectedNoteCountToAdd = BeatDiv(endTick - startTick, beatPerNote) + 1;
+			// NOTE: Web port change ("more-grid"), iterates grid line indices instead of adding a fixed beat step so that inexact grid divisions don't drift
+			const startGridIndex = RoundBeatToGridIndex(this.RangeSelectionGetMin(), this.CurrentGridBarDivision);
+			const endGridIndex = RoundBeatToGridIndex(this.RangeSelectionGetMax(), this.CurrentGridBarDivision);
+			const maxExpectedNoteCountToAdd = Math.abs(endGridIndex - startGridIndex) + 1;
 
 			const newNotesToAdd: Note[] = [];
 			for (let i = 0; i < maxExpectedNoteCountToAdd; i++)
 			{
-				const beatForThisNote = Math.min(startTick, endTick) + (i * beatPerNote);
+				const beatForThisNote = GridIndexToBeat(Math.min(startGridIndex, endGridIndex) + i, this.CurrentGridBarDivision);
 				if (notes.TryFindOverlappingBeatIndex(beatForThisNote, beatForThisNote) < 0)
 					newNotesToAdd.push(MakeNote({ BeatTime: beatForThisNote, Type: noteTypeToInsert }));
 			}
@@ -1685,7 +1689,7 @@ export class ChartTimeline
 			return;
 
 		const oldCursorTime = context.GetCursorTime();
-		const newCursorBeat = placedBeat + GetGridBeatSnap(this.CurrentGridBarDivision);
+		const newCursorBeat = StepBeatByGridDivision(placedBeat, +1, this.CurrentGridBarDivision);
 		context.SetCursorBeat(newCursorBeat);
 
 		// NOTE: Keep the cursor at the same screen position (same as StepCursorByBeat) so that consecutive notes can be placed without scrolling
@@ -2056,18 +2060,19 @@ export class ChartTimeline
 				if (!io.KeyCtrl)
 				{
 					// TODO: Maybe refine further...
-					const cursorStepKeyDistance = context.GetIsPlayback() ?
-						(io.KeyAlt ? GetGridBeatSnap(this.CurrentGridBarDivision) : io.KeyShift ? BeatFromBeats(2) : BeatFromBeats(1)) :
-						(io.KeyShift ? BeatFromBeats(1) : GetGridBeatSnap(this.CurrentGridBarDivision));
+					// NOTE: Web port change ("more-grid"), grid steps are done by grid line index (StepCursorByGrid) so that inexact grid divisions also work
+					const stepByGrid = context.GetIsPlayback() ? io.KeyAlt : !io.KeyShift;
+					const cursorStepKeyDistance = context.GetIsPlayback() ? (io.KeyShift ? BeatFromBeats(2) : BeatFromBeats(1)) : BeatFromBeats(1);
+					const stepCursor = (direction: number) => { if (stepByGrid) this.StepCursorByGrid(context, direction); else this.StepCursorByBeat(context, cursorStepKeyDistance * direction); };
 
 					// NOTE: Separate down checks for right priority, although ideally the *last held* binding should probably be prioritized instead (which would be a bit tricky)
 					if (io.IsAnyDown(input.Timeline_StepCursorRight, InputModifierBehavior.Relaxed))
 					{
-						if (io.IsAnyPressed(input.Timeline_StepCursorRight, true, InputModifierBehavior.Relaxed)) { this.StepCursorByBeat(context, cursorStepKeyDistance * +1); }
+						if (io.IsAnyPressed(input.Timeline_StepCursorRight, true, InputModifierBehavior.Relaxed)) { stepCursor(+1); }
 					}
 					else if (io.IsAnyDown(input.Timeline_StepCursorLeft, InputModifierBehavior.Relaxed))
 					{
-						if (io.IsAnyPressed(input.Timeline_StepCursorLeft, true, InputModifierBehavior.Relaxed)) { this.StepCursorByBeat(context, cursorStepKeyDistance * -1); }
+						if (io.IsAnyPressed(input.Timeline_StepCursorLeft, true, InputModifierBehavior.Relaxed)) { stepCursor(-1); }
 					}
 				}
 
@@ -2539,14 +2544,20 @@ export class ChartTimeline
 		if (this.GridSnapLineAnimationCurrent > 0.0)
 		{
 			const minMaxVisibleTime = this.GetMinMaxVisibleTime();
-			const gridBeatSnap = GetGridBeatSnap(this.CurrentGridBarDivision);
-			const minVisibleBeat = FloorBeatToGrid(context.TimeToBeat(minMaxVisibleTime.Min), gridBeatSnap) - gridBeatSnap;
-			const maxVisibleBeat = CeilBeatToGrid(context.TimeToBeat(minMaxVisibleTime.Max), gridBeatSnap) + gridBeatSnap;
+			// NOTE: Web port change ("more-grid"), iterates grid line indices instead of adding a fixed beat step so that inexact grid divisions don't drift
+			const division = this.CurrentGridBarDivision;
+			const minVisibleGridIndex = FloorBeatToGridIndex(context.TimeToBeat(minMaxVisibleTime.Min), division) - 1;
+			const maxVisibleGridIndex = CeilBeatToGridIndex(context.TimeToBeat(minMaxVisibleTime.Max), division) + 1;
 
 			const gridSnapLineColor = ColorU32WithAlpha(IsTupletBarDivision(this.CurrentGridBarDivision) ? Colors.TimelineGridSnapTupletLineColor : Colors.TimelineGridSnapLineColor, this.GridSnapLineAnimationCurrent);
-			const lastBeat = ClampTop(maxVisibleBeat, context.TimeToBeat(context.Chart.GetDurationOrDefault()));
-			for (let beatIt = ClampBot(minVisibleBeat, 0); beatIt <= lastBeat; beatIt += gridBeatSnap)
+			const lastBeat = ClampTop(GridIndexToBeat(maxVisibleGridIndex, division), context.TimeToBeat(context.Chart.GetDurationOrDefault()));
+
+			// NOTE: Very fine (> 1/192) divisions are only drawn once their lines are far enough apart to not turn into thousands of lines when zoomed out
+			const gridLineSpacing = camera.TimeToLocalSpaceX(context.BeatToTime(GridIndexToBeat(Math.max(minVisibleGridIndex, 0) + 1, division))) - camera.TimeToLocalSpaceX(context.BeatToTime(GridIndexToBeat(Math.max(minVisibleGridIndex, 0), division)));
+			const skipGridLines = (division > 192) && (Math.abs(gridLineSpacing) < 2.0);
+			for (let gridIndex = Math.max(minVisibleGridIndex, 0); !skipGridLines && GridIndexToBeat(gridIndex, division) <= lastBeat; gridIndex++)
 			{
+				const beatIt = GridIndexToBeat(gridIndex, division);
 				const screenSpaceTL = this.LocalToScreenSpace(V2(camera.TimeToLocalSpaceX(context.BeatToTime(beatIt)), 0.0));
 				d.AddLine(screenSpaceTL, V2(screenSpaceTL.x, screenSpaceTL.y + R.Content.GetHeight()), gridSnapLineColor);
 			}

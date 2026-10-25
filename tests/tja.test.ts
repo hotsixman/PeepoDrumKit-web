@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import * as TJA from "../src/formats/tja";
 import { ChartProject, CreateChartProjectFromTJA, ConvertChartProjectToTJA, DebugCompareCharts, NoteType } from "../src/editor/chart";
-import { SortedTempoMap, TempoChange, Tempo, TicksPerBeat, OriginalTicksPerBeat, BeatFromBars, SafetyCheckTempo } from "../src/core/beat";
+import { SortedTempoMap, TempoChange, Tempo, TicksPerBeat, OriginalTicksPerBeat, BeatFromBars, SafetyCheckTempo, GetGridBeatSnap, FloorBeatToGrid, CeilBeatToGrid, RoundBeatToGrid, IsExactGridBarDivision, GridIndexToBeat, FloorBeatToGridDivision, CeilBeatToGridDivision, RoundBeatToGridDivision, StepBeatByGridDivision } from "../src/core/beat";
 
 // NOTE: Values below are written in the original resolution (48 ticks per beat) and scaled to the current one
 const K = TicksPerBeat / OriginalTicksPerBeat;
@@ -219,6 +219,67 @@ describe("TempoMap", () =>
 		{
 			expect(map.TimeToBeat(map.BeatToTime(c.BeatTime))).toBe(c.BeatTime);
 			expect(map.TimeToBeat(map.BeatToTime(c.BeatTime + 12345))).toBe(c.BeatTime + 12345);
+		}
+	});
+});
+
+describe("Grid divisions", () =>
+{
+	it("match the original fixed step grid for exact divisions", () =>
+	{
+		// NOTE: "+ 0" because the original can return -0 for zero which is the same beat
+		for (const division of [1, 2, 3, 4, 6, 8, 12, 16, 24, 32, 48, 64, 96, 192, 5, 7, 20])
+		{
+			expect(IsExactGridBarDivision(division)).toBe(true);
+			const snap = GetGridBeatSnap(division);
+			for (const beat of [-snap * 3 - 1, -1, 0, 1, snap - 1, snap, snap + 1, snap * 17 + 12345, BeatFromBars(7) + 3])
+			{
+				expect((FloorBeatToGridDivision(beat, division)) + 0).toBe((FloorBeatToGrid(beat, snap)) + 0);
+				expect((CeilBeatToGridDivision(beat, division)) + 0).toBe((CeilBeatToGrid(beat, snap)) + 0);
+				expect((RoundBeatToGridDivision(beat, division)) + 0).toBe((RoundBeatToGrid(beat, snap)) + 0);
+				expect((StepBeatByGridDivision(beat, 3, division)) + 0).toBe((RoundBeatToGrid(beat, snap) + snap * 3) + 0);
+			}
+		}
+	});
+
+	it("never drift for divisions that don't divide the tick resolution", () =>
+	{
+		const bar = BeatFromBars(1);
+		for (const division of [17, 19, 23, 25, 31, 97, 191, 997])
+		{
+			expect(IsExactGridBarDivision(division)).toBe(false);
+			for (const index of [-5, 0, 1, 2, division - 1, division, division * 50 + 3])
+			{
+				const beat = GridIndexToBeat(index, division);
+				expect(Math.abs(beat - index * bar / division)).toBeLessThanOrEqual(0.5);
+				expect(FloorBeatToGridDivision(beat, division)).toBe(beat);
+				expect(FloorBeatToGridDivision(beat + 1, division)).toBe(beat);
+				expect(FloorBeatToGridDivision(beat - 1, division)).toBe(GridIndexToBeat(index - 1, division));
+				expect(CeilBeatToGridDivision(beat + 1, division)).toBe(GridIndexToBeat(index + 1, division));
+				expect(StepBeatByGridDivision(beat, 1, division)).toBe(GridIndexToBeat(index + 1, division));
+			}
+			// NOTE: Bar lines stay exactly on the grid
+			expect(GridIndexToBeat(division * 3, division)).toBe(bar * 3);
+		}
+	});
+
+	it("exports notes placed on any grid with the matching number of characters", () =>
+	{
+		for (const division of [17, 23])
+		{
+			const { chart } = Parse(SampleTJA);
+			const notes = chart.Courses[0].Notes_Normal;
+			const template = notes.Sorted[0];
+			notes.Sorted = notes.Sorted.filter((n) => n.BeatTime >= BeatFromBars(1));
+			for (let i = 0; i < division; i += 2)
+				notes.Sorted.push({ ...template, BeatTime: GridIndexToBeat(i, division), BeatDuration: 0, Type: NoteType.Don });
+			notes.Sorted.sort((a, b) => a.BeatTime - b.BeatTime);
+
+			const out = TJA.MakeParsedTJA();
+			ConvertChartProjectToTJA(chart, out);
+			const exported = TJA.ConvertParsedToText(out, TJA.Encoding.Unknown);
+			const expectedLine = Array.from({ length: division }, (_, i) => (i % 2 === 0) ? "1" : "0").join("") + ",";
+			expect(exported).toContain("\n" + expectedLine + "\n");
 		}
 	});
 });

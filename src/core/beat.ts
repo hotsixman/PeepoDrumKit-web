@@ -28,6 +28,30 @@ export const CeilBeatToGrid = (beat: Beat, grid: Beat): Beat => Math.trunc(Math.
 export const GetGridBeatSnap = (gridBarDivision: number): Beat => IDiv(BeatFromBars(1), gridBarDivision);
 export const IsTupletBarDivision = (gridBarDivision: number): boolean => (gridBarDivision % 3 === 0);
 
+// NOTE: Web port addition ("more-grid"), grid helpers that work for *any* bar division. The n-th grid line is placed at round(n * bar / division)
+//		 so divisions that don't divide the tick resolution (1/17, 1/19 ...) are off by at most half a tick instead of drifting further each step.
+//		 For divisions that do divide the resolution the results are identical to the fixed GetGridBeatSnap() step versions above
+export const IsExactGridBarDivision = (gridBarDivision: number): boolean => (BeatFromBars(1) % gridBarDivision) === 0;
+export const GridIndexToBeat = (gridIndex: number, gridBarDivision: number): Beat => Round((gridIndex * BeatFromBars(1)) / gridBarDivision);
+export function FloorBeatToGridIndex(beat: Beat, gridBarDivision: number): number
+{
+	let index = Math.floor((beat * gridBarDivision) / BeatFromBars(1));
+	while (GridIndexToBeat(index + 1, gridBarDivision) <= beat) index++;
+	while (GridIndexToBeat(index, gridBarDivision) > beat) index--;
+	return index;
+}
+export function CeilBeatToGridIndex(beat: Beat, gridBarDivision: number): number
+{
+	const index = FloorBeatToGridIndex(beat, gridBarDivision);
+	return (GridIndexToBeat(index, gridBarDivision) === beat) ? index : (index + 1);
+}
+export const RoundBeatToGridIndex = (beat: Beat, gridBarDivision: number): number => Round((beat * gridBarDivision) / BeatFromBars(1));
+export const FloorBeatToGridDivision = (beat: Beat, gridBarDivision: number): Beat => GridIndexToBeat(FloorBeatToGridIndex(beat, gridBarDivision), gridBarDivision);
+export const CeilBeatToGridDivision = (beat: Beat, gridBarDivision: number): Beat => GridIndexToBeat(CeilBeatToGridIndex(beat, gridBarDivision), gridBarDivision);
+export const RoundBeatToGridDivision = (beat: Beat, gridBarDivision: number): Beat => GridIndexToBeat(RoundBeatToGridIndex(beat, gridBarDivision), gridBarDivision);
+/** NOTE: Rounds to the closest grid line first, then moves by the given number of grid lines */
+export const StepBeatByGridDivision = (beat: Beat, steps: number, gridBarDivision: number): Beat => GridIndexToBeat(RoundBeatToGridIndex(beat, gridBarDivision) + steps, gridBarDivision);
+
 export interface Tempo { BPM: number; }
 export const Tempo = (bpm: number = 0.0): Tempo => ({ BPM: bpm });
 export const SafetyCheckTempo = (v: Tempo): Tempo => (v.BPM <= -1.0) ? Tempo(-v.BPM) : Tempo(ClampBot(v.BPM, 1.0));

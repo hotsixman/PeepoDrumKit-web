@@ -5,8 +5,8 @@
 	import { Settings } from "../../editor/settings";
 	import { TimeSpace, ConvertTimeSpace, ScrollSpeedToTempo, ScrollTempoToSpeed, IsNotesList, GenericList, ForEachSelectedChartItem, MakeScrollChange, MakeBarLineChange, MakeGoGoRange, NewSortedGoGoRangesList, CloneGoGoRange, GoGoGetStart, GoGoGetEnd, type GoGoRange } from "../../editor/chart";
 	import { type Time, Clamp, ClampBot, TimeToString, TimeToMS, TimeFromMS, FormatG, F32Max } from "../../core/types";
-	import { FloorBeatToGrid, GetGridBeatSnap, FallbackTempo, FallbackTimeSignature, TempoChange, TimeSignatureChange, Tempo, TimeSignature, IsTimeSignatureSupported, OriginalTicksPerBeat } from "../../core/beat";
-	import { TimelineDragScalarSpeedAtZoomSec, TimelineDragScalarSpeedAtZoomMS, ValidGridBarDivisions, QuickGridBarDivisions, ClosestValidGridBarDivision } from "../../editor/timeline";
+	import { FallbackTempo, FallbackTimeSignature, TempoChange, TimeSignatureChange, Tempo, TimeSignature, IsTimeSignatureSupported, OriginalTicksPerBeat } from "../../core/beat";
+	import { TimelineDragScalarSpeedAtZoomSec, TimelineDragScalarSpeedAtZoomMS, MinGridBarDivision, MaxGridBarDivision, QuickGridBarDivisions, ClampGridBarDivision } from "../../editor/timeline";
 	import * as Commands from "../../editor/undo-commands";
 	import Section from "../widgets/Section.svelte";
 	import PropertyTable from "../widgets/PropertyTable.svelte";
@@ -31,7 +31,7 @@
 			if (it.List !== GenericList.ScrollChanges) isAnyItemOtherThanScrollChangesSelected = true;
 		});
 
-		const cursorBeat = FloorBeatToGrid(context.GetCursorBeat(), GetGridBeatSnap(timeline.CurrentGridBarDivision));
+		const cursorBeat = timeline.FloorBeatToCurrentGrid(context.GetCursorBeat());
 		const tempoChangeAtCursor = course.TempoMap.Tempo.TryFindLastAtBeat(cursorBeat);
 		const signatureChangeAtCursor = course.TempoMap.Signature.TryFindLastAtBeat(cursorBeat);
 		const scrollChangeAtCursor = course.ScrollChanges.TryFindLastAtBeat(cursorBeat);
@@ -74,15 +74,13 @@
 	function setGridBarDivision(v: number): void
 	{
 		if (!Number.isFinite(v) || v <= 0) return;
-		timeline.CurrentGridBarDivision = ClosestValidGridBarDivision(v);
+		timeline.CurrentGridBarDivision = ClampGridBarDivision(v);
 		Invalidate();
 	}
 
 	function stepGridBarDivision(delta: number): void
 	{
-		const index = ValidGridBarDivisions.indexOf(ClosestValidGridBarDivision(timeline.CurrentGridBarDivision));
-		const newIndex = Clamp(index + Math.sign(delta), 0, ValidGridBarDivisions.length - 1);
-		setGridBarDivision(ValidGridBarDivisions[newIndex]);
+		setGridBarDivision(timeline.CurrentGridBarDivision + Math.sign(delta));
 	}
 
 	function setChartDuration(v: Time) { exec(new Commands.ChangeChartDuration(context.Chart, v)); }
@@ -166,12 +164,12 @@
 		</PropertyTable>
 	</Section>
 
-	<!-- NOTE: Web port addition, freely set the grid division (snapped to the closest value that lands exactly on the internal tick resolution) -->
+	<!-- NOTE: Web port addition, freely set the grid division to any whole number -->
 	<Section title={UI_Str("Grid")}>
 		<PropertyTable>
 			<div class="prop-label">{UI_Str("Grid Division")}</div>
 			<div class="prop-value">
-				<DragNumber value={data.gridBarDivision} integer dragSpeed={0.05} step={1} stepFast={1} min={1} max={ValidGridBarDivisions[ValidGridBarDivisions.length - 1]} format={(v) => `1 / ${v}`}
+				<DragNumber value={data.gridBarDivision} integer dragSpeed={0.05} step={1} stepFast={1} min={MinGridBarDivision} max={MaxGridBarDivision} format={(v) => `1 / ${v}`}
 					onexact={(v) => setGridBarDivision(v)} onincrement={(delta) => stepGridBarDivision(delta)} />
 			</div>
 			<div class="prop-label"></div>

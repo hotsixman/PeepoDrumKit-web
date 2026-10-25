@@ -5,7 +5,7 @@ import
 {
 	type Beat, type Tempo, type TimeSignature, type BeatItem, type TempoChange, type TimeSignatureChange,
 	BeatSortedList, BeatSortedForwardIterator, SortedTempoMap, TempoChange as MakeTempoChange, TimeSignatureChange as MakeTimeSignatureChange,
-	TimeSignature as MakeTimeSignature, FallbackTempo, GetGridBeatSnap, GetDurationPerBar, TimeSignatureEquals, CloneTempoChange, CloneTimeSignatureChange, BeatDiv,
+	TimeSignature as MakeTimeSignature, FallbackTempo, GetDurationPerBar, TimeSignatureEquals, CloneTempoChange, CloneTimeSignatureChange, BeatFromBars,
 } from "../core/beat";
 import { ControlFlow } from "../core/types";
 import * as TJA from "../formats/tja";
@@ -83,7 +83,9 @@ export function FlipNote(v: NoteType): NoteType
 }
 export const IsNoteFlippable = (v: NoteType) => FlipNote(v) !== v;
 
-export const DefaultBalloonPopCount = (beatDuration: Beat, gridBarDivision: number): number => BeatDiv(beatDuration, GetGridBeatSnap(gridBarDivision));
+// NOTE: Web port change ("more-grid"), originally BeatDiv(beatDuration, GetGridBeatSnap(gridBarDivision)). Works for any bar division
+//		 by allowing a 1 tick tolerance for grid lines that had to be rounded to the closest tick
+export const DefaultBalloonPopCount = (beatDuration: Beat, gridBarDivision: number): number => Math.trunc(((beatDuration + Math.sign(beatDuration)) * gridBarDivision) / BeatFromBars(1));
 
 export enum DifficultyType { Easy, Normal, Hard, Oni, OniUra, Count }
 export const DifficultyTypeNames: readonly string[] = ["Easy", "Normal", "Hard", "Oni", "Oni-Ura"];

@@ -5,7 +5,7 @@
 	import { UI_Str } from "../../editor/i18n";
 	import { BuildMenus, type MenuItem } from "../menus";
 	import { NoteType, ToBigNoteIf, DifficultyTypeNames } from "../../editor/chart";
-	import { GetGridBeatSnap, BeatFromBeats } from "../../core/beat";
+	import { BeatFromBeats } from "../../core/beat";
 	import { ClipboardAction, TransformAction } from "../../editor/timeline";
 	import { FormatG, ToPercent, TimeToString } from "../../core/types";
 	import { Input } from "../../editor/input";
@@ -93,7 +93,8 @@
 
 	function stepCursor(direction: number, big: boolean): void
 	{
-		const distance = context.GetIsPlayback() ? BeatFromBeats(big ? 2 : 1) : (big ? BeatFromBeats(1) : GetGridBeatSnap(timeline.CurrentGridBarDivision));
+		if (!context.GetIsPlayback() && !big) { timeline.StepCursorByGrid(context, direction); return; }
+		const distance = context.GetIsPlayback() ? BeatFromBeats(big ? 2 : 1) : BeatFromBeats(1);
 		timeline.StepCursorByBeat(context, distance * direction);
 	}
 
