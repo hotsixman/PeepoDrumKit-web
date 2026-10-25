@@ -3,7 +3,7 @@
 //
 // NOTE: The original loads "assets/audio/*.wav" files which are not part of the public repository.
 //		 The don / ka hit sounds are loaded from "public/assets/audio/{don,ka}.wav" instead (taken from https://github.com/hotsixman/tja-tools,
-//		 previewer/src/assets, level matched to the same perceived loudness), the metronome is synthesized procedurally.
+//		 previewer/src/assets, level adjusted with the ka peaks limited to avoid clipping), the metronome is synthesized procedurally.
 //		 Until the files are decoded (or should loading fail) synthesized fallback sounds are used. Everything can optionally be replaced by user provided files
 import { CPUStopwatch, type Time, TimeFromFrames } from "../core/types";
 import { Engine } from "../audio/engine";

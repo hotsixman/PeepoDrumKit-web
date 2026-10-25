@@ -54,7 +54,7 @@ npm test         # vitest (TJA 파서 / 라운드트립 테스트)
 ## 원본과의 차이점
 
 - **UI**: Dear ImGui 대신 Svelte 컴포넌트 + Canvas 2D로 새로 구성했습니다. 타임라인과 게임 미리보기는 원본과 같은 즉시 모드 방식으로 매 프레임 캔버스에 그립니다.
-- **오디오**: WASAPI 대신 Web Audio API를 사용합니다. 원본의 효과음 wav 파일은 저장소에 포함되어 있지 않아, 쿵/딱 타격음은 [tja-tools](https://github.com/hotsixman/tja-tools)의 previewer 효과음(체감 음량을 같게 맞춤)을 사용하고 메트로놈은 합성해서 사용합니다. 설정에서 사용자 효과음 파일을 지정할 수 있습니다.
+- **오디오**: WASAPI 대신 Web Audio API를 사용합니다. 원본의 효과음 wav 파일은 저장소에 포함되어 있지 않아, 쿵/딱 타격음은 [tja-tools](https://github.com/hotsixman/tja-tools)의 previewer 효과음(음량 조정)을 사용하고 메트로놈은 합성해서 사용합니다. 설정에서 사용자 효과음 파일을 지정할 수 있습니다.
 - **파일 접근**: 브라우저 보안 정책상 File System Access API(지원 브라우저) 또는 업로드/다운로드 방식으로 파일을 다룹니다. 곡 파일은 TJA와 함께 열거나 폴더 열기로 불러옵니다.
 - **성능**: 파형은 줌 레벨별 타일로 오프스크린 캔버스에 캐시하고, 파형 밉맵 생성은 Web Worker에서 수행하며, 미니맵 역시 캐시하여 큰 채보에서도 프레임 저하가 없도록 했습니다.
 

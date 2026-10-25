@@ -26,4 +26,4 @@ The user interface (Svelte components, mobile layout, touch gestures) is newly w
 
 ## Other assets
 
-- `public/assets/audio/don.wav`, `public/assets/audio/ka.wav`: hit sounds from [hotsixman/tja-tools](https://github.com/hotsixman/tja-tools) (`previewer/src/assets`), converted to WAV and level matched to the same perceived loudness.
+- `public/assets/audio/don.wav`, `public/assets/audio/ka.wav`: hit sounds from [hotsixman/tja-tools](https://github.com/hotsixman/tja-tools) (`previewer/src/assets`), converted to WAV and level adjusted (ka peak limited to avoid clipping).
