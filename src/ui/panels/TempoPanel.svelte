@@ -6,7 +6,7 @@
 	import { TimeSpace, ConvertTimeSpace, ScrollSpeedToTempo, ScrollTempoToSpeed, IsNotesList, GenericList, ForEachSelectedChartItem, MakeScrollChange, MakeBarLineChange, MakeGoGoRange, NewSortedGoGoRangesList, CloneGoGoRange, GoGoGetStart, GoGoGetEnd, type GoGoRange } from "../../editor/chart";
 	import { type Time, Clamp, ClampBot, TimeToString, TimeToMS, TimeFromMS, FormatG, F32Max } from "../../core/types";
 	import { FloorBeatToGrid, GetGridBeatSnap, FallbackTempo, FallbackTimeSignature, TempoChange, TimeSignatureChange, Tempo, TimeSignature, IsTimeSignatureSupported, TicksPerBeat } from "../../core/beat";
-	import { TimelineDragScalarSpeedAtZoomSec, TimelineDragScalarSpeedAtZoomMS } from "../../editor/timeline";
+	import { TimelineDragScalarSpeedAtZoomSec, TimelineDragScalarSpeedAtZoomMS, ValidGridBarDivisions, ClosestValidGridBarDivision } from "../../editor/timeline";
 	import * as Commands from "../../editor/undo-commands";
 	import Section from "../widgets/Section.svelte";
 	import PropertyTable from "../widgets/PropertyTable.svelte";
@@ -42,6 +42,7 @@
 		const scrollSpeedAtCursor = (scrollChangeAtCursor === null) ? 1.0 : scrollChangeAtCursor.ScrollSpeed;
 
 		return {
+			gridBarDivision: timeline.CurrentGridBarDivision,
 			displaySpace: Settings.General.DisplayTimeInSongSpace ? TimeSpace.Song : TimeSpace.Chart,
 			chartDuration: chart.ChartDuration, songDemoStartTime: chart.SongDemoStartTime, songOffset: chart.SongOffset,
 			// NOTE: This might seem like a strange design decision at first (hence it at least being optional)
@@ -69,6 +70,20 @@
 	function toDisplay(v: Time, storageSpace: TimeSpace): number { return ConvertTimeSpace(v, storageSpace, data.displaySpace, context.Chart.SongOffset); }
 	function fromDisplay(v: number, storageSpace: TimeSpace): Time { return ConvertTimeSpace(v, data.displaySpace, storageSpace, context.Chart.SongOffset); }
 	function minDisplay(storageSpace: TimeSpace): number { return ConvertTimeSpace(0.0, storageSpace, data.displaySpace, context.Chart.SongOffset); }
+
+	function setGridBarDivision(v: number): void
+	{
+		if (!Number.isFinite(v) || v <= 0) return;
+		timeline.CurrentGridBarDivision = ClosestValidGridBarDivision(v);
+		Invalidate();
+	}
+
+	function stepGridBarDivision(delta: number): void
+	{
+		const index = ValidGridBarDivisions.indexOf(ClosestValidGridBarDivision(timeline.CurrentGridBarDivision));
+		const newIndex = Clamp(index + Math.sign(delta), 0, ValidGridBarDivisions.length - 1);
+		setGridBarDivision(ValidGridBarDivisions[newIndex]);
+	}
 
 	function setChartDuration(v: Time) { exec(new Commands.ChangeChartDuration(context.Chart, v)); }
 	function setSongDemoStartTime(v: Time) { exec(new Commands.ChangeSongDemoStartTime(context.Chart, v)); }
@@ -151,6 +166,25 @@
 		</PropertyTable>
 	</Section>
 
+	<!-- NOTE: Web port addition, freely set the grid division (snapped to the closest value that lands exactly on the internal 192 ticks per bar resolution) -->
+	<Section title={UI_Str("Grid")}>
+		<PropertyTable>
+			<div class="prop-label">{UI_Str("Grid Division")}</div>
+			<div class="prop-value">
+				<DragNumber value={data.gridBarDivision} integer dragSpeed={0.05} step={1} stepFast={1} min={1} max={ValidGridBarDivisions[ValidGridBarDivisions.length - 1]} format={(v) => `1 / ${v}`}
+					onexact={(v) => setGridBarDivision(v)} onincrement={(delta) => stepGridBarDivision(delta)} />
+			</div>
+			<div class="prop-label"></div>
+			<div class="prop-value">
+				<div class="grid-presets">
+					{#each ValidGridBarDivisions as division}
+						<button class:on={division === data.gridBarDivision} onclick={() => setGridBarDivision(division)}>{division}</button>
+					{/each}
+				</div>
+			</div>
+		</PropertyTable>
+	</Section>
+
 	<Section title={UI_Str("Tempo")}>
 		<div class:disabled-block={data.disableWidgets}>
 			<PropertyTable>
@@ -224,6 +258,9 @@
 </div>
 
 <style>
+	.grid-presets { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; }
+	.grid-presets button { padding: 0; min-width: 0; font-variant-numeric: tabular-nums; }
+	.grid-presets button.on { background: var(--header-active); border-color: var(--accent); }
 	.time-display { flex: 1; min-width: 0; font-variant-numeric: tabular-nums; padding: 0 4px; }
 	.half { flex: 1; }
 	.fraction { display: grid; grid-template-columns: 1fr auto 1fr; gap: 4px; align-items: center; }

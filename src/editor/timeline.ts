@@ -155,6 +155,16 @@ export class TimelineRegions
 }
 
 export const AllowedGridBarDivisions: readonly number[] = [4, 8, 12, 16, 24, 32, 48, 64, 96, 192];
+// NOTE: Web port addition, every grid division that lands exactly on the internal beat tick resolution (1, 2, 3, 4, 6, 8, 12 ... 192 per bar).
+//		 Used for freely setting the grid instead of only the presets above
+export const ValidGridBarDivisions: readonly number[] = Array.from({ length: BeatFromBars(1) }, (_, i) => i + 1).filter((it) => (BeatFromBars(1) % it) === 0);
+export function ClosestValidGridBarDivision(barDivision: number): number
+{
+	let closest = ValidGridBarDivisions[0];
+	for (const it of ValidGridBarDivisions)
+		if (Math.abs(Math.log(it / barDivision)) < Math.abs(Math.log(closest / barDivision))) closest = it;
+	return closest;
+}
 
 // NOTE: Nudge the startup camera position and min scrollbar.x slightly to the left
 //		 so that a line drawn at worldspace position { x = 0.0f } is fully visible
@@ -1554,9 +1564,12 @@ export class ChartTimeline
 
 	ChangeGridDivision(direction: number): void
 	{
-		let currentGridDivisionIndex = 0;
-		AllowedGridBarDivisions.forEach((it, i) => { if (it === this.CurrentGridBarDivision) currentGridDivisionIndex = i; });
-		this.CurrentGridBarDivision = AllowedGridBarDivisions[Clamp(currentGridDivisionIndex + direction, 0, AllowedGridBarDivisions.length - 1)];
+		// NOTE: Step relative to the current value so that freely set (non preset) divisions step to the neighboring preset
+		const current = this.CurrentGridBarDivision;
+		if (direction > 0)
+			this.CurrentGridBarDivision = AllowedGridBarDivisions.find((it) => it > current) ?? current;
+		else if (direction < 0)
+			this.CurrentGridBarDivision = [...AllowedGridBarDivisions].reverse().find((it) => it < current) ?? current;
 	}
 
 	ChangePlaybackSpeedStep(context: ChartContext, direction: number, speeds: readonly number[] = Settings.General.PlaybackSpeedSteps.V): void

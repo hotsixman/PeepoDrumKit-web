@@ -220,6 +220,7 @@ const JA: Record<string, string> = {
 	"Timeline Size": "タイムラインのサイズ",
 	"Preview Hit Volume": "プレビュー打撃音量",
 	"Editor only, not saved to the TJA file (SEVOL)": "エディター専用、TJAファイル(SEVOL)には保存されません",
+	"Grid Division": "グリッド分割",
 };
 
 const KO: Record<string, string> = {
